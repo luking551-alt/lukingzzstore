@@ -1,0 +1,31 @@
+### LOGIN ADMIN
+POST http://localhost:3000/api/admin/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "556c761848958dd055f5526022625ae3aa1b173572592117"
+}
+### 2. LOGIN USER
+# Klik "Send Request" di sini dulu, lalu copy token dari hasilnya
+POST http://localhost:3000/api/users/login
+Content-Type: application/json
+
+{
+  "phone": "081111111111",
+  "password": "passwordrahasia123"
+}
+
+### 3. SPIN SLOT
+POST http://localhost:3000/api/slot/spin
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhMTVkYTc1My05ZGQ0LTRmNWQtYTA5ZS1iMzJhZGQwMDA4MDIiLCJwaG9uZSI6IjA4MTExMTExMTExMSIsImlhdCI6MTc5NDU0NjA0NywiZXhwIjoxNzk3MTM4MDQ3LCJhdWQiOiJESUdJVEFMS1UtVVNFUiIsImlzcyI6IkRJR0lUQUxLVSJ9.kkdydiqYMOawJj4LUvG_qH11JdcAACECgXXS1oRV2ko
+
+{
+  "bet": 1000
+}
+
+###
+GET http://localhost:3000/api/admin/game-stats
+
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZG1pbklkIjoiMTgwOTAzY2YtNmJjMy00MGYzLWI1NzQtMzExNjc2NDI5YmExIiwidXNlcm5hbWUiOiJhZG1pbiIsImlhdCI6MTc5NDc2MzE3MiwiZXhwIjoxNzk0NzkxOTcyLCJhdWQiOiJESUdJVEFMS1UtQURNSU4iLCJpc3MiOiJESUdJVEFMS1UifQ.w0YxghydfFBBR7t0PtfCBSDC1tLnGl_yQQu3GSwv4wM
