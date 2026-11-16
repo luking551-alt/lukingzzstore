@@ -10,7 +10,7 @@ import {
 import Slot from './Slot';
 import LandingPage from './LandingPage';
 
-const API_URL = '/api'
+const API_URL = ''
 const QRIS_IMAGE_URL = '/images/qris-dana.png'
 
 const CATEGORY_ORDER = ['E-Wallet', 'Pulsa', 'Game', 'Layanan Lainnya'] as const
