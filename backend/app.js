@@ -337,9 +337,7 @@ function handleError(res, error, message = 'Terjadi kesalahan pada server.') {
 // 2. HALAMAN PEMERIKSAAN SERVER
 // =====================================================
 
-app.get('/', (req, res) => {
-  res.json({ success: true, app: 'DIGITALKU', message: 'Backend DIGITALKU aktif.' })
-})
+
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, status: 'online' })
@@ -2266,23 +2264,6 @@ app.get('/api/admin/print-orders', authenticateAdmin, async (req, res) => {
   }
 });
 
-// =====================================================
-// 26. PENANGANAN ROUTE TIDAK DITEMUKAN
-// =====================================================
-
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Endpoint tidak ditemukan.' })
-})
-
-// =====================================================
-// 27. PENANGANAN ERROR UMUM
-// =====================================================
-
-app.use((error, req, res, next) => {
-  console.error(error)
-  if (res.headersSent) return next(error)
-  res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server.' })
-})
 
 // =====================================================
 // 28. JALANKAN SERVER
@@ -2292,16 +2273,52 @@ app.use((error, req, res, next) => {
 // app.listen(PORT, () => console.log('Server running'))
 
 // Tambahkan ini di paling bawah untuk Vercel
-module.exports = app;
 // =====================================================
 // MENYAJIKAN FRONTEND REACT (Folder dist)
 // =====================================================
+
+// =====================================================
+// 26. MENYAJIKAN FRONTEND DIGITALKU
+// =====================================================
+
 const path = require('path');
 
-// Arahkan ke folder dist yang ada di dalam backend
-app.use(express.static(path.join(__dirname, 'dist')));
+const frontendDist = path.join(__dirname, 'dist');
 
-// Jika rute tidak ditemukan di API, arahkan ke React
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+app.use(express.static(frontendDist));
+
+app.get('/{*splat}', (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+
+  res.sendFile(path.join(frontendDist, 'index.html'));
 });
+
+// =====================================================
+// 27. PENANGANAN ROUTE TIDAK DITEMUKAN
+// =====================================================
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint tidak ditemukan.'
+  });
+});
+
+// =====================================================
+// 28. PENANGANAN ERROR UMUM
+// =====================================================
+
+app.use((error, req, res, next) => {
+  console.error(error);
+
+  if (res.headersSent) return next(error);
+
+  res.status(500).json({
+    success: false,
+    message: 'Terjadi kesalahan pada server.'
+  });
+});
+
+module.exports = app;
