@@ -10,7 +10,7 @@ import {
 import Slot from './Slot';
 import LandingPage from './LandingPage';
 
-const API_URL = 'http://localhost:3000'
+const API_URL = '/api'
 const QRIS_IMAGE_URL = '/images/qris-dana.png'
 
 const CATEGORY_ORDER = ['E-Wallet', 'Pulsa', 'Game', 'Layanan Lainnya'] as const
@@ -1500,7 +1500,7 @@ const [referralCode, setReferralCode] = useState('')
                               if (!window.confirm(`Berikan Jackpot ke ${u.phone}?`)) return;
                               const token = sessionStorage.getItem('digitalku_admin_token');
                               try {
-                                const res = await fetch(`http://localhost:3000/api/admin/users/${u.id}/force-win`, {
+                                const res = await fetch(`/api/admin/users/${u.id}/force-win`, {
                                   method: 'POST',
                                   headers: { 'Authorization': `Bearer ${token}` }
                                 });
@@ -1519,7 +1519,7 @@ const [referralCode, setReferralCode] = useState('')
                             if (!window.confirm(`Blokir/Buka blokir akun ${u.phone}?`)) return;
                             const token = sessionStorage.getItem('digitalku_admin_token');
                             try {
-                              const res = await fetch(`http://localhost:3000/api/admin/users/${u.id}/toggle-block`, {
+                              const res = await fetch(`/api/admin/users/${u.id}/toggle-block`, {
                                 method: 'POST',
                                 headers: { 'Authorization': `Bearer ${token}` }
                               });

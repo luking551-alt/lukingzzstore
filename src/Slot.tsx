@@ -35,7 +35,7 @@ export default function Slot() {
 
   const fetchBalance = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/users/balance', {
+      const res = await fetch('/api/users/balance', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -70,7 +70,7 @@ export default function Slot() {
     }, 80);
 
     try {
-      const res = await fetch('http://localhost:3000/api/slot/spin', {
+      const res = await fetch('/api/slot/spin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
