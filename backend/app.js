@@ -17,7 +17,7 @@ const SLOT_BIG_WIN_THRESHOLD = 10000   // Rupiah, threshold untuk log activity
 const SLOT_MAX_PAYOUT = 1000000; // Batas maksimal kemenangan per spin (Rp 1.000.000)
 
 // 3 reel, masing-masing 12 simbol dengan distribusi identik
-// Probabilitas simbol: 🍒 3/12, 🍋 3/12, 🍊 2/12, 🔔 2/12, ⭐ 1/12, 💎 1/12
+// Probabilitas simbol: ðŸ’ 3/12, ðŸ‹ 3/12, ðŸŠ 2/12, ðŸ”” 2/12, â­ 1/12, ðŸ’Ž 1/12
 const SLOT_REELS = [
   [
     'https://cdn-icons-png.flaticon.com/512/6911/6911931.png',
@@ -63,8 +63,8 @@ const SLOT_REELS = [
   ]
 ];
 
-// Paytable: kombinasi 3-simbol identik → multiplier dari bet
-// RTP teoretis = 91.0% → House Edge = 9.0%
+// Paytable: kombinasi 3-simbol identik â†’ multiplier dari bet
+// RTP teoretis = 91.0% â†’ House Edge = 9.0%
 // Kita gunakan URL gambar sebagai "kunci" untuk menentukan hadiah
 const SLOT_PAYTABLE = {
   'https://cdn-icons-png.flaticon.com/512/6911/6911964.png': 50, // Mahkota (Paling langka)
@@ -75,7 +75,7 @@ const SLOT_PAYTABLE = {
   'https://cdn-icons-png.flaticon.com/512/2361/2361722.png': 0   // Penjepit (Tidak ada hadiah)
 };
 
-// 2 cherry (reel 1 & 2 cherry, reel 3 bebas) → 1x
+// 2 cherry (reel 1 & 2 cherry, reel 3 bebas) â†’ 1x
 const SLOT_TWO_CHERRY_MULT = 1
 
 // 1. Generate 5 Reel x 3 Baris
@@ -398,10 +398,10 @@ app.post('/api/users/register', userAuthLimiter, async (req, res) => {
   const phone = normalizePhone(rawPhone)
 
   if (phone.length < 10 || phone.length > 15) {
-    return res.status(400).json({ success: false, message: 'Nomor HP harus berisi 10–15 angka.' })
+    return res.status(400).json({ success: false, message: 'Nomor HP harus berisi 10â€“15 angka.' })
   }
   if (rawPassword.length < 8 || rawPassword.length > 128) {
-    return res.status(400).json({ success: false, message: 'Password harus 8–128 karakter.' })
+    return res.status(400).json({ success: false, message: 'Password harus 8â€“128 karakter.' })
   }
   if (rawFullName.length > 100) {
     return res.status(400).json({ success: false, message: 'Nama lengkap maksimal 100 karakter.' })
@@ -1026,10 +1026,10 @@ app.get('/api/slot/paytable', (req, res) => {
       label: `${mult}x bet`,
     })),
     two_cherry: {
-      description: 'Reel 1 & 2 menunjukkan 🍒, reel 3 bebas',
+      description: 'Reel 1 & 2 menunjukkan ðŸ’, reel 3 bebas',
       multiplier: SLOT_TWO_CHERRY_MULT,
     },
-    symbols: ['🍒', '🍋', '🍊', '🔔', '⭐', '💎'],
+    symbols: ['ðŸ’', 'ðŸ‹', 'ðŸŠ', 'ðŸ””', 'â­', 'ðŸ’Ž'],
   })
 })
 // =====================================================
@@ -1155,7 +1155,7 @@ app.post('/api/orders', authenticateUser, orderLimiter, async (req, res) => {
     const totalAmount = finalAmount + orderServiceFee
     if (isBankTransferProduct && payment_method !== 'saldo') {
       await client.query('ROLLBACK')
-      return res.status(400).json({ success: false, message: 'Transfer All Bank wajib dibayar menggunakan saldo LukingzzStore.' })
+      return res.status(400).json({ success: false, message: 'Transfer All Bank wajib dibayar menggunakan saldo NEXIPAY.' })
     }
     let isPaidWithBalance = false
 
@@ -1187,9 +1187,7 @@ app.post('/api/orders', authenticateUser, orderLimiter, async (req, res) => {
 
     if (isPaidWithBalance) {
       await client.query(`UPDATE orders SET order_status = 'paid' WHERE id = $1`, [order.id])
-         // Pemberian poin super untung: 1 poin per Rp 5.000 belanja
-   const earnedPoints = Math.max(1, Math.floor(totalAmount / 5000));
-      await client.query('UPDATE users SET points = points + $1 WHERE id = $2', [earnedPoints, user.id])
+    
     }
     // --- LOGIKA BONUS REFERRAL ---
     // Cek apakah user ini punya pengundang (referred_by) dan belum pernah dapat bonus
@@ -1250,7 +1248,7 @@ app.post('/api/admin/setup', setupLimiter, async (req, res) => {
   const password = String(req.body.password || '')
 
   if (!/^[a-zA-Z0-9_]{4,30}$/.test(username)) {
-    return res.status(400).json({ success: false, message: 'Username harus 4–30 karakter.' })
+    return res.status(400).json({ success: false, message: 'Username harus 4â€“30 karakter.' })
   }
   if (password.length < 12 || password.length > 128) {
     return res.status(400).json({ success: false, message: 'Password minimal 12 karakter.' })
@@ -1417,7 +1415,7 @@ app.put('/api/admin/users/:userId/reset-password', authenticateAdmin, async (req
   }
   const newPassword = String(req.body.new_password || '')
   if (newPassword.length < 8 || newPassword.length > 128) {
-    return res.status(400).json({ success: false, message: 'Password baru harus 8–128 karakter.' })
+    return res.status(400).json({ success: false, message: 'Password baru harus 8â€“128 karakter.' })
   }
   try {
     const passwordHash = await bcrypt.hash(newPassword, 12)
@@ -1564,6 +1562,13 @@ app.post('/api/admin/variants', authenticateAdmin, productLimiter, async (req, r
     )
     res.status(201).json({ success: true, message: 'Varian produk berhasil ditambahkan.', variant: result.rows[0] })
   } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        message: 'Kode varian sudah digunakan pada produk ini.'
+      })
+    }
+
     handleError(res, error, 'Gagal menambahkan varian.')
   }
 })
@@ -1663,9 +1668,11 @@ app.post('/api/admin/payments/:orderId/verify', authenticateAdmin, paymentVerify
          verified_by = $2, transaction_reference = $3, updated_at = NOW() WHERE order_id = $4`,
       [finalReceivedAmount, req.admin.adminId, transactionReference, orderId]
     )
-    if (order.order_status === 'pending') {
-      await client.query(`UPDATE orders SET order_status = 'paid', updated_at = NOW() WHERE id = $1`, [orderId])
-    }
+  if (order.order_status === 'pending') {
+  await client.query(`UPDATE orders SET order_status = 'paid', updated_at = NOW() WHERE id = $1`, [orderId])
+}
+
+
     await logActivity(client, req.admin.adminId, 'verify_payment', 'order', orderId, `Pembayaran pesanan ${order.order_number} diverifikasi.`, req.ip)
     await client.query('COMMIT')
     res.json({ success: true, message: 'Pembayaran berhasil diverifikasi.' })
@@ -1817,6 +1824,12 @@ app.put('/api/admin/orders/:orderId/status', authenticateAdmin, orderStatusLimit
       return res.status(400).json({ success: false, message: `Perubahan status dari ${order.order_status} ke ${newStatus} tidak diizinkan.` })
     }
     await client.query('UPDATE orders SET order_status = $1, updated_at = NOW() WHERE id = $2', [newStatus, orderId])
+    if (newStatus === 'completed') {
+  await client.query(
+    'UPDATE users SET points = points + 5 WHERE id = $1',
+    [order.user_id]
+  )
+}
     if (newStatus === 'failed' && String(order.product_code || '').toUpperCase() === 'BANKTRANSFER' && String(order.payment_method || '').toLowerCase() === 'saldo') {
       await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [Number(order.total_amount), order.user_id])
       await logActivity(client, req.admin.adminId, 'refund_bank_transfer_balance', 'order', orderId, `Saldo Rp${Number(order.total_amount).toLocaleString('id-ID')} dikembalikan untuk pesanan transfer bank ${order.order_number}.`, req.ip)
@@ -1897,9 +1910,15 @@ app.put('/api/admin/orders/:orderId/processing', authenticateAdmin, orderStatusL
          updated_at = NOW()`,
       [orderId, req.admin.adminId, supplierName, supplierTransactionId, processingStatus, purchaseAmount, adminNotes]
     )
-    if (processingStatus === 'success' && order.order_status === 'processing') {
-      await client.query(`UPDATE orders SET order_status = 'completed', updated_at = NOW() WHERE id = $1`, [orderId])
-    }
+   if (processingStatus === 'success' && order.order_status === 'processing') {
+  await client.query(`UPDATE orders SET order_status = 'completed', updated_at = NOW() WHERE id = $1`, [orderId])
+
+  // Bonus 5 poin setelah layanan berhasil diselesaikan
+  await client.query(
+    'UPDATE users SET points = points + 5 WHERE id = $1',
+    [order.user_id]
+  )
+}
     if (processingStatus === 'failed' && order.order_status === 'processing') {
       await client.query(`UPDATE orders SET order_status = 'failed', updated_at = NOW() WHERE id = $1`, [orderId])
       if (String(order.product_code || '').toUpperCase() === 'BANKTRANSFER' && String(order.payment_method || '').toLowerCase() === 'saldo') {
@@ -2264,6 +2283,907 @@ app.get('/api/admin/print-orders', authenticateAdmin, async (req, res) => {
   }
 });
 
+// =====================================================
+// 27A. USER: AJUKAN PEMBAYARAN QRIS
+// =====================================================
+
+app.post('/api/users/qris-requests', authenticateUser, userOrderLimiter, async (req, res) => {
+  const merchantName = String(req.body.merchant_name || '').trim()
+  const merchantCity = String(req.body.merchant_city || '').trim()
+  const qrisPayload = String(req.body.qris_payload || '').trim()
+  const amount = Number(req.body.amount)
+  const currency = String(req.body.currency || 'IDR').trim().toUpperCase()
+  const customerNote = String(req.body.customer_note || '').trim()
+
+  if (!merchantName || merchantName.length > 150) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nama merchant wajib diisi dan maksimal 150 karakter.'
+    })
+  }
+
+  if (merchantCity.length > 100) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nama kota maksimal 100 karakter.'
+    })
+  }
+
+  if (!qrisPayload || qrisPayload.length > 10000) {
+    return res.status(400).json({
+      success: false,
+      message: 'Data QRIS tidak valid.'
+    })
+  }
+
+  if (!isPositiveInteger(amount) || amount < 1000 || amount > 100000000) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nominal harus antara Rp 1.000 dan Rp 100.000.000.'
+    })
+  }
+
+  if (currency !== 'IDR') {
+    return res.status(400).json({
+      success: false,
+      message: 'Mata uang yang didukung hanya IDR.'
+    })
+  }
+
+  if (customerNote.length > 500) {
+    return res.status(400).json({
+      success: false,
+      message: 'Catatan maksimal 500 karakter.'
+    })
+  }
+
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    const userResult = await client.query(
+      `SELECT balance, is_active, is_blocked
+       FROM users
+       WHERE id = $1
+       FOR UPDATE`,
+      [req.user.userId]
+    )
+
+    if (userResult.rowCount === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({
+        success: false,
+        message: 'Pelanggan tidak ditemukan.'
+      })
+    }
+
+    const user = userResult.rows[0]
+
+    if (!user.is_active || user.is_blocked) {
+      await client.query('ROLLBACK')
+      return res.status(403).json({
+        success: false,
+        message: 'Akun tidak dapat melakukan pembayaran.'
+      })
+    }
+
+    const currentBalance = Number(user.balance)
+
+    if (currentBalance - amount < 10000) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({
+        success: false,
+        message: `Saldo tidak cukup. Minimal saldo tersisa Rp 10.000. Saldo Anda: Rp ${currentBalance.toLocaleString('id-ID')}.`
+      })
+    }
+
+    await client.query(
+      'UPDATE users SET balance = balance - $1 WHERE id = $2',
+      [amount, req.user.userId]
+    )
+
+    const result = await client.query(
+      `INSERT INTO qris_payment_requests
+        (user_id, merchant_name, merchant_city, qris_payload,
+         amount, currency, customer_note, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+       RETURNING id, merchant_name, merchant_city, amount,
+                 currency, customer_note, status, created_at`,
+      [
+        req.user.userId,
+        merchantName,
+        merchantCity || null,
+        qrisPayload,
+        amount,
+        currency,
+        customerNote || null
+      ]
+    )
+
+    await client.query('COMMIT')
+
+    res.status(201).json({
+      success: true,
+      message: 'Permintaan pembayaran QRIS berhasil diajukan. Saldo Anda ditahan sementara menunggu pemeriksaan admin.',
+      request: result.rows[0],
+      remaining_balance: currentBalance - amount
+    })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    handleError(res, error, 'Gagal mengajukan pembayaran QRIS.')
+  } finally {
+    client.release()
+  }
+})
+
+// =====================================================
+// 27B. ADMIN: LIHAT PERMINTAAN PEMBAYARAN QRIS
+// =====================================================
+
+app.get('/api/admin/qris-requests', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         q.id,
+         q.user_id,
+         q.merchant_name,
+         q.merchant_city,
+         q.qris_payload,
+         q.amount,
+         q.currency,
+         q.customer_note,
+         q.status,
+         q.admin_notes,
+         q.created_at,
+         u.full_name,
+         u.phone,
+         u.balance
+       FROM qris_payment_requests q
+       JOIN users u ON u.id = q.user_id
+       WHERE q.status = 'pending'
+       ORDER BY q.created_at ASC`
+    )
+
+    res.json({
+      success: true,
+      requests: result.rows
+    })
+  } catch (error) {
+    handleError(res, error, 'Gagal mengambil permintaan pembayaran QRIS.')
+  }
+})
+
+// =====================================================
+// 27C. ADMIN: SELESAIKAN / TOLAK PEMBAYARAN QRIS
+// =====================================================
+
+app.post('/api/admin/qris-requests/:id/process', authenticateAdmin, async (req, res) => {
+  const { id } = req.params
+  const action = String(req.body.action || '').trim()
+  const adminNotes = String(req.body.admin_notes || '').trim()
+
+  if (!isUUID(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'ID permintaan tidak valid.'
+    })
+  }
+
+  if (!['complete', 'reject'].includes(action)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Aksi tidak valid.'
+    })
+  }
+
+  if (adminNotes.length > 500) {
+    return res.status(400).json({
+      success: false,
+      message: 'Catatan admin maksimal 500 karakter.'
+    })
+  }
+
+  if (action === 'complete' && !adminNotes) {
+    return res.status(400).json({
+      success: false,
+      message: 'Isi catatan konfirmasi pembayaran merchant sebelum menyelesaikan permintaan.'
+    })
+  }
+
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    const requestResult = await client.query(
+      `SELECT id, user_id, amount, status
+       FROM qris_payment_requests
+       WHERE id = $1
+       FOR UPDATE`,
+      [id]
+    )
+
+    if (
+      requestResult.rowCount === 0 ||
+      requestResult.rows[0].status !== 'pending'
+    ) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({
+        success: false,
+        message: 'Permintaan tidak ditemukan atau sudah diproses.'
+      })
+    }
+
+    const request = requestResult.rows[0]
+
+    if (action === 'complete') {
+      await client.query(
+        `UPDATE qris_payment_requests
+         SET status = 'completed',
+             admin_id = $1,
+             admin_notes = $2,
+             processed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $3`,
+        [req.admin.adminId, adminNotes, id]
+      )
+    } else {
+      await client.query(
+        'UPDATE users SET balance = balance + $1 WHERE id = $2',
+        [request.amount, request.user_id]
+      )
+
+      await client.query(
+        `UPDATE qris_payment_requests
+         SET status = 'rejected',
+             admin_id = $1,
+             admin_notes = $2,
+             processed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $3`,
+        [
+          req.admin.adminId,
+          adminNotes || 'Permintaan pembayaran ditolak.',
+          id
+        ]
+      )
+    }
+
+    await client.query('COMMIT')
+
+    res.json({
+      success: true,
+      message: action === 'complete'
+        ? 'Pembayaran QRIS berhasil diselesaikan.'
+        : 'Permintaan QRIS ditolak. Saldo pelanggan telah dikembalikan.'
+    })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    handleError(res, error, 'Gagal memproses permintaan QRIS.')
+  } finally {
+    client.release()
+  }
+})
+
+ // =====================================================
+ // 27C. USER: MELIHAT PAKET MASA AKTIF KARTU
+ // =====================================================
+
+app.get('/api/validity/packages', async (req, res) => {
+  const operator = String(req.query.operator || '').trim();
+
+  if (operator && !VALIDITY_OPERATORS.includes(operator)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Operator tidak valid.'
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, operator, package_name, duration_days, price
+       FROM validity_packages
+       WHERE is_active = TRUE
+         AND ($1 = '' OR operator = $1)
+       ORDER BY operator ASC, duration_days ASC`,
+      [operator]
+    );
+
+    res.json({
+      success: true,
+      packages: result.rows
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal mengambil daftar paket masa aktif.');
+  }
+});
+
+ // =====================================================
+ // 27E. USER: AJUKAN MASA AKTIF KARTU
+ // =====================================================
+
+app.post('/api/users/validity-requests', authenticateUser, userOrderLimiter, async (req, res) => {
+  const packageId = String(req.body.package_id || '').trim();
+  const destinationNumber = String(req.body.destination_number || '').trim();
+
+  if (!isUUID(packageId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Paket yang dipilih tidak valid.'
+    });
+  }
+
+  if (!/^[0-9]{8,15}$/.test(destinationNumber)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nomor tujuan harus terdiri dari 8 sampai 15 angka.'
+    });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Pastikan paket tersedia dan masih aktif.
+    const packageResult = await client.query(
+      `SELECT id, operator, package_name, duration_days, price
+       FROM validity_packages
+       WHERE id = $1 AND is_active = TRUE
+       FOR SHARE`,
+      [packageId]
+    );
+
+    if (packageResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: 'Paket tidak ditemukan atau sudah tidak aktif.'
+      });
+    }
+
+    const selectedPackage = packageResult.rows[0];
+    const amount = Number(selectedPackage.price);
+
+    if (!isPositiveInteger(amount)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Harga paket tidak valid.'
+      });
+    }
+
+    // Kunci saldo pelanggan agar tidak terjadi pemotongan bersamaan.
+    const userResult = await client.query(
+      `SELECT balance, is_active, is_blocked
+       FROM users
+       WHERE id = $1
+       FOR UPDATE`,
+      [req.user.userId]
+    );
+
+    if (userResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: 'Pelanggan tidak ditemukan.'
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.is_active || user.is_blocked) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        success: false,
+        message: 'Akun tidak dapat melakukan pengajuan.'
+      });
+    }
+
+    const currentBalance = Number(user.balance);
+
+    if (
+      !Number.isSafeInteger(currentBalance) ||
+      currentBalance - amount < 10000
+    ) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: `Saldo tidak cukup. Minimal saldo tersisa Rp10.000. Saldo Anda: Rp${currentBalance.toLocaleString('id-ID')}.`
+      });
+    }
+
+    // Potong saldo pelanggan.
+    await client.query(
+      'UPDATE users SET balance = balance - $1 WHERE id = $2',
+      [amount, req.user.userId]
+    );
+
+    // Simpan detail paket sebagai snapshot pesanan.
+    const requestResult = await client.query(
+      `INSERT INTO validity_requests
+        (user_id, operator, destination_number, package_name,
+         duration_days, price, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+       RETURNING id, operator, destination_number, package_name,
+                 duration_days, price, status, created_at`,
+      [
+        req.user.userId,
+        selectedPackage.operator,
+        destinationNumber,
+        selectedPackage.package_name,
+        selectedPackage.duration_days,
+        amount
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(201).json({
+      success: true,
+      message: 'Pengajuan masa aktif berhasil dibuat. Menunggu pemeriksaan admin.',
+      request: requestResult.rows[0],
+      remaining_balance: currentBalance - amount
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    handleError(res, error, 'Gagal mengajukan masa aktif kartu.');
+  } finally {
+    client.release();
+  }
+});
+
+ // =====================================================
+ // 27F. USER: RIWAYAT PENGAJUAN MASA AKTIF
+ // =====================================================
+
+app.get('/api/users/validity-requests', authenticateUser, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, operator, destination_number, package_name,
+              duration_days, price, status, admin_notes,
+              created_at, updated_at, processed_at
+       FROM validity_requests
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [req.user.userId]
+    );
+
+    res.json({
+      success: true,
+      requests: result.rows
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal mengambil riwayat masa aktif kartu.');
+  }
+});
+
+// =====================================================
+// 27G. ADMIN: DAFTAR PENGAJUAN MASA AKTIF
+// =====================================================
+
+app.get('/api/admin/validity-requests', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         v.id,
+         v.user_id,
+         v.operator,
+         v.destination_number,
+         v.package_name,
+         v.duration_days,
+         v.price,
+         v.status,
+         v.admin_id,
+         v.admin_notes,
+         v.created_at,
+         v.updated_at,
+         v.processed_at,
+         u.full_name,
+         u.phone
+       FROM validity_requests v
+       JOIN users u ON u.id = v.user_id
+       ORDER BY
+         CASE
+           WHEN v.status = 'pending' THEN 1
+           WHEN v.status = 'processing' THEN 2
+           WHEN v.status = 'completed' THEN 3
+           ELSE 4
+         END,
+         v.created_at ASC`
+    );
+
+    res.json({
+      success: true,
+      requests: result.rows
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal mengambil daftar pengajuan masa aktif.');
+  }
+});
+
+// =====================================================
+// 27H. ADMIN: PROSES PENGAJUAN MASA AKTIF
+// =====================================================
+
+app.post('/api/admin/validity-requests/:id/process', authenticateAdmin, async (req, res) => {
+  const { id } = req.params;
+  const action = String(req.body.action || '').trim();
+  const adminNotes = String(req.body.admin_notes || '').trim();
+
+  if (!isUUID(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'ID pengajuan tidak valid.'
+    });
+  }
+
+  if (!['processing', 'complete', 'reject'].includes(action)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Aksi pemrosesan tidak valid.'
+    });
+  }
+
+  if (adminNotes.length > 500) {
+    return res.status(400).json({
+      success: false,
+      message: 'Catatan admin maksimal 500 karakter.'
+    });
+  }
+
+  if (action === 'complete' && !adminNotes) {
+    return res.status(400).json({
+      success: false,
+      message: 'Isi catatan hasil pemrosesan sebelum menyelesaikan pengajuan.'
+    });
+  }
+
+  const client = await pool.connect();
+  let transactionStarted = false;
+
+  try {
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    const requestResult = await client.query(
+      `SELECT id, user_id, price, status
+       FROM validity_requests
+       WHERE id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (requestResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+
+      return res.status(404).json({
+        success: false,
+        message: 'Pengajuan tidak ditemukan.'
+      });
+    }
+
+    const request = requestResult.rows[0];
+
+    if (action === 'processing') {
+      if (request.status !== 'pending') {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(400).json({
+          success: false,
+          message: 'Hanya pengajuan pending yang dapat diproses.'
+        });
+      }
+
+      await client.query(
+        `UPDATE validity_requests
+         SET status = 'processing',
+             admin_id = $1,
+             admin_notes = $2,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [
+          req.admin.adminId,
+          adminNotes || null,
+          id
+        ]
+      );
+    }
+
+    if (action === 'complete') {
+      if (request.status !== 'processing') {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(400).json({
+          success: false,
+          message: 'Pengajuan harus berstatus processing sebelum diselesaikan.'
+        });
+      }
+
+      await client.query(
+        `UPDATE validity_requests
+         SET status = 'completed',
+             admin_id = $1,
+             admin_notes = $2,
+             processed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $3`,
+        [
+          req.admin.adminId,
+          adminNotes,
+          id
+        ]
+      );
+    }
+
+    if (action === 'reject') {
+      if (!['pending', 'processing'].includes(request.status)) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+
+        return res.status(400).json({
+          success: false,
+          message: 'Pengajuan ini sudah diproses sebelumnya.'
+        });
+      }
+
+      const refundResult = await client.query(
+        `UPDATE users
+         SET balance = balance + $1
+         WHERE id = $2
+         RETURNING id`,
+        [request.price, request.user_id]
+      );
+
+      if (refundResult.rowCount === 0) {
+        throw new Error('Pelanggan tidak ditemukan saat pengembalian saldo.');
+      }
+
+      await client.query(
+        `UPDATE validity_requests
+         SET status = 'rejected',
+             admin_id = $1,
+             admin_notes = $2,
+             processed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $3`,
+        [
+          req.admin.adminId,
+          adminNotes || 'Pengajuan ditolak. Saldo telah dikembalikan.',
+          id
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+    transactionStarted = false;
+
+    return res.json({
+      success: true,
+      message: action === 'processing'
+        ? 'Pengajuan berhasil masuk proses pengerjaan.'
+        : action === 'complete'
+          ? 'Pengajuan berhasil diselesaikan.'
+          : 'Pengajuan ditolak. Saldo pelanggan telah dikembalikan.'
+    });
+
+  } catch (error) {
+    if (transactionStarted) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
+
+    handleError(res, error, 'Gagal memproses pengajuan masa aktif.');
+  } finally {
+    client.release();
+  }
+});
+
+
+// =====================================================
+// 27D. ADMIN: MANAJEMEN PAKET MASA AKTIF KARTU
+// =====================================================
+
+const VALIDITY_OPERATORS = [
+  'Telkomsel',
+  'Indosat',
+  'XL',
+  'Tri',
+  'Axis',
+  'Smartfren'
+];
+
+// ADMIN: MELIHAT SEMUA PAKET
+app.get('/api/admin/validity/packages', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, operator, package_name, duration_days,
+              price, is_active, created_at, updated_at
+       FROM validity_packages
+       ORDER BY operator ASC, duration_days ASC, created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      packages: result.rows
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal mengambil paket masa aktif.');
+  }
+});
+
+// ADMIN: MENAMBAHKAN PAKET
+app.post('/api/admin/validity/packages', authenticateAdmin, async (req, res) => {
+  const operator = String(req.body.operator || '').trim();
+  const packageName = String(req.body.package_name || '').trim();
+  const durationDays = Number(req.body.duration_days);
+  const price = Number(req.body.price);
+
+  if (!VALIDITY_OPERATORS.includes(operator)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Operator tidak valid.'
+    });
+  }
+
+  if (!packageName || packageName.length > 100) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nama paket wajib diisi dan maksimal 100 karakter.'
+    });
+  }
+
+  if (!isPositiveInteger(durationDays)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Durasi harus berupa bilangan bulat positif.'
+    });
+  }
+
+  if (!isPositiveInteger(price)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Harga harus berupa bilangan bulat positif.'
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO validity_packages
+        (operator, package_name, duration_days, price)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [operator, packageName, durationDays, price]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Paket masa aktif berhasil ditambahkan.',
+      package: result.rows[0]
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal menambahkan paket masa aktif.');
+  }
+});
+
+// ADMIN: MENGUBAH PAKET
+app.put('/api/admin/validity/packages/:id', authenticateAdmin, async (req, res) => {
+  const { id } = req.params;
+  const operator = String(req.body.operator || '').trim();
+  const packageName = String(req.body.package_name || '').trim();
+  const durationDays = Number(req.body.duration_days);
+  const price = Number(req.body.price);
+
+  if (!isUUID(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'ID paket tidak valid.'
+    });
+  }
+
+  if (!VALIDITY_OPERATORS.includes(operator)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Operator tidak valid.'
+    });
+  }
+
+  if (!packageName || packageName.length > 100) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nama paket wajib diisi dan maksimal 100 karakter.'
+    });
+  }
+
+  if (!isPositiveInteger(durationDays) || !isPositiveInteger(price)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Durasi dan harga harus berupa bilangan bulat positif.'
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE validity_packages
+       SET operator = $1,
+           package_name = $2,
+           duration_days = $3,
+           price = $4,
+           updated_at = NOW()
+       WHERE id = $5
+       RETURNING *`,
+      [operator, packageName, durationDays, price, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Paket tidak ditemukan.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Paket masa aktif berhasil diperbarui.',
+      package: result.rows[0]
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal memperbarui paket masa aktif.');
+  }
+});
+
+// ADMIN: AKTIFKAN / NONAKTIFKAN PAKET
+app.patch('/api/admin/validity/packages/:id/status', authenticateAdmin, async (req, res) => {
+  const { id } = req.params;
+  const isActive = req.body.is_active;
+
+  if (!isUUID(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'ID paket tidak valid.'
+    });
+  }
+
+  if (typeof isActive !== 'boolean') {
+    return res.status(400).json({
+      success: false,
+      message: 'Status paket harus berupa true atau false.'
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE validity_packages
+       SET is_active = $1,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [isActive, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Paket tidak ditemukan.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: isActive
+        ? 'Paket berhasil diaktifkan.'
+        : 'Paket berhasil dinonaktifkan.',
+      package: result.rows[0]
+    });
+  } catch (error) {
+    handleError(res, error, 'Gagal mengubah status paket.');
+  }
+});
+
 
 // =====================================================
 // 28. JALANKAN SERVER
@@ -2321,4 +3241,12 @@ app.use((error, req, res, next) => {
   });
 });
 
+// Jalankan server hanya di lingkungan lokal
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`DIGITALKU backend running at http://localhost:${PORT}`)
+  })
+}
+
 module.exports = app;
+

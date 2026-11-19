@@ -1,9 +1,33 @@
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", sans-serif;
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+}
+
 @keyframes slide-in {
-  0% { transform: translateX(-100%); opacity: 0; }
-  100% { transform: translateX(0); opacity: 1; }
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .animate-slide-in {
   animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Plus Jakarta Sans", sans-serif;
 }

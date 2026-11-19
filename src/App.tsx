@@ -1,16 +1,21 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   Wallet, Search, Bell, ChevronRight, ArrowDownUp, Clock, ShieldCheck, Zap,
   Home, ReceiptText, UserRound, CircleHelp, LockKeyhole, LogOut, LayoutDashboard,
   ArrowLeft, RefreshCw, AlertCircle, CheckCircle2, ClipboardList, PackageCheck,
-  Package, Plus, Pencil, X, Layers, UserPlus, Coins, Users, ArrowUpFromLine
+  Package, Plus, Pencil, X, Layers, UserPlus, Coins, Users, ArrowUpFromLine,
+QrCode
 } from 'lucide-react'
 // @ts-ignore
 import Slot from './Slot';
 import LandingPage from './LandingPage';
+import QrisScanner from './QrisScanner';
+import QRCode from 'qrcode'
 
-const API_URL = ''
+const API_URL = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : ''
 const QRIS_IMAGE_URL = '/images/qris-dana.png'
 
 const CATEGORY_ORDER = ['E-Wallet', 'Pulsa', 'Game', 'Layanan Lainnya'] as const
@@ -18,7 +23,10 @@ type CategoryName = (typeof CATEGORY_ORDER)[number]
 
 const CATEGORY_MAP: Record<string, CategoryName> = {
   DANA: 'E-Wallet', OVO: 'E-Wallet', GOPAY: 'E-Wallet', SHOPEEPAY: 'E-Wallet',
-  AXIS: 'Pulsa', INDOSAT: 'Pulsa', SMARTFREN: 'Pulsa', TELKOMSEL: 'Pulsa', TRI: 'Pulsa', XL: 'Pulsa',
+  DATA: 'Pulsa',
+    AXIS: 'Pulsa', INDOSAT: 'Pulsa', SMARTFREN: 'Pulsa', TELKOMSEL: 'Pulsa', TRI: 'Pulsa', XL: 'Pulsa',
+  AXIS_DATA: 'Pulsa', INDOSAT_DATA: 'Pulsa', SMARTFREN_DATA: 'Pulsa',
+  TELKOMSEL_DATA: 'Pulsa', TRI_DATA: 'Pulsa', XL_DATA: 'Pulsa',
   'FREE FIRE': 'Game', 'GENSHIN IMPACT': 'Game', 'MOBILE LEGENDS': 'Game', 'PUBG MOBILE': 'Game', ROBLOX: 'Game',
   PLN: 'Layanan Lainnya', 'GOOGLE PLAY': 'Layanan Lainnya', BANKTRANSFER: 'Layanan Lainnya', 'TRANSFER ALL BANK': 'Layanan Lainnya',
 }
@@ -34,6 +42,21 @@ function getCategoryForProduct(product: ApiProduct): CategoryName {
   const byName = CATEGORY_MAP[String(product.name || '').toUpperCase()]
   if (byName) return byName
   return 'Lainnya'
+}
+function detectDataOperator(phoneNumber: string): string {
+  const number = phoneNumber.replace(/\D/g, '')
+  const localNumber = number.startsWith('62')
+    ? `0${number.slice(2)}`
+    : number
+
+  if (/^08(11|12|13|21|22|23|51|52|53)/.test(localNumber)) return 'TELKOMSEL'
+  if (/^08(14|15|16|55|56|57|58)/.test(localNumber)) return 'INDOSAT'
+  if (/^08(17|18|19|59|77|78)/.test(localNumber)) return 'XL'
+  if (/^08(31|32|33|38)/.test(localNumber)) return 'AXIS'
+  if (/^08(81|82|83|84|85|86|87|88|89)/.test(localNumber)) return 'SMARTFREN'
+  if (/^089[5-9]/.test(localNumber)) return 'TRI'
+
+  return ''
 }
 
 function getProductColor(product: ApiProduct) {
@@ -61,6 +84,7 @@ function getProductSymbol(product: ApiProduct) {
   if (code === 'GOOGLEPLAY' || name === 'GOOGLEPLAY') return '/images/googleplay.png'
   if (code === 'ROBLOX' || name === 'ROBLOX') return '/images/roblox.png'
   if (code === 'PLN' || name === 'PLN') return '/images/pln.png'
+  if (code === 'DATA' || name === 'PAKETDATA') return '/images/paket-data.png'
 
   if (LOGO_MAP[String(product.code || '').toUpperCase()]) return LOGO_MAP[String(product.code || '').toUpperCase()]
   
@@ -109,10 +133,59 @@ type WithdrawRequest = {
   phone: string
   full_name: string | null
 }
+type AdminQrisRequest = {
+  id: string
+  user_id: string
+  merchant_name: string
+  merchant_city: string | null
+  qris_payload: string
+  amount: number
+  currency: string
+  customer_note: string | null
+  status: string
+  admin_notes: string | null
+  created_at: string
+  full_name: string | null
+  phone: string
+  balance: number
+}
 
-type CustomerTab = 'home' | 'orders' | 'track' | 'account'
+
+type ValidityRequest = {
+  id: string
+  user_id: string
+  operator: string
+  destination_number: string
+  package_name: string
+  duration_days: number
+  price: number
+  status: 'pending' | 'processing' | 'completed' | 'rejected'
+  admin_id: string | null
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
+  processed_at: string | null
+  full_name: string | null
+  phone: string
+}
+
+
+type ValidityPackage = {
+  id: string
+  operator: string
+  package_name: string
+  duration_days: number
+  price: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+type CustomerTab = 'home' | 'orders' | 'scan' | 'track' | 'account' | 'validity'
 type UserPage = 'main' | 'login' | 'register'
-type AdminTab = 'orders' | 'products' | 'users' | 'withdraws'
+
+type AdminTab = 'orders' | 'products' | 'users' | 'withdraws' | 'qris' | 'validity'
+
 
 const USER_TOKEN_KEY = 'digitalku_user_token'
 
@@ -145,7 +218,7 @@ function statusColor(status: string) {
 const ADMIN_WA_NUMBER = '6281356682926'
 
 function WhatsappButton() {
-  const link = `https://t.me/LukingzzStoreBot`
+  const link = `https://t.me/NEXIPAYBot`
   return (
     <a
       href={link}
@@ -178,7 +251,7 @@ function QrisPayment({ totalAmount, orderNumber }: { totalAmount: number; orderN
         <p className="mt-1 text-xs text-slate-500">Gunakan aplikasi pembayaran yang mendukung QRIS.</p>
       </div>
       <div className="mx-auto mt-4 max-w-[280px] rounded-xl border border-slate-200 bg-white p-3">
-        <img src={QRIS_IMAGE_URL} alt="QRIS DANA Bisnis LukingzzStore" className="mx-auto aspect-square w-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+        <img src={QRIS_IMAGE_URL} alt="QRIS DANA Bisnis NEXIPAY" className="mx-auto aspect-square w-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none' }} />
       </div>
       <div className="mt-4 rounded-xl bg-blue-50 p-4 text-center">
         <p className="text-xs font-medium text-blue-700">TOTAL YANG HARUS DIBAYAR</p>
@@ -199,6 +272,58 @@ function QrisPayment({ totalAmount, orderNumber }: { totalAmount: number; orderN
         <ShieldCheck size={17} className="mt-0.5 shrink-0 text-blue-700" /><p className="text-[11px] leading-5 text-blue-800">Verifikasi pembayaran dilakukan secara manual oleh admin. Sistem belum mendeteksi pembayaran secara otomatis.</p>
       </div>
       <p className="mt-3 text-center text-[10px] leading-4 text-slate-400">Jangan melanjutkan pembayaran apabila nama penerima yang muncul tidak sesuai dengan pemilik QRIS.</p>
+    </div>
+  )
+}
+
+function QrisBarcode({ payload }: { payload: string }) {
+  const [qrImage, setQrImage] = useState('')
+  const [qrError, setQrError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    setQrImage('')
+    setQrError('')
+
+    QRCode.toDataURL(payload, {
+      width: 280,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => {
+        if (!cancelled) setQrImage(url)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQrError('Barcode QRIS tidak dapat dibuat.')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [payload])
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-center">
+      <p className="mb-2 text-sm font-bold text-slate-700">
+        Barcode QRIS Merchant
+      </p>
+
+      {qrImage ? (
+        <img
+          src={qrImage}
+          alt="Barcode QRIS Merchant"
+          className="mx-auto h-auto w-full max-w-[280px]"
+        />
+      ) : qrError ? (
+        <p className="text-xs text-red-600">{qrError}</p>
+      ) : (
+        <p className="text-xs text-slate-500">
+          Membuat barcode QRIS...
+        </p>
+      )}
     </div>
   )
 }
@@ -229,8 +354,10 @@ return savedPage === 'store' ? 'store' : 'landing'
   const [productsLoading, setProductsLoading] = useState(true)
   const [productsError, setProductsError] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
+  const [showPurchaseForm, setShowPurchaseForm] = useState(false)
   const [selectedVariantId, setSelectedVariantId] = useState('')
   const [phone, setPhone] = useState('')
+  const [selectedDataOperator, setSelectedDataOperator] = useState('')
   const [transferBank, setTransferBank] = useState('BCA')
   const [transferAccountNumber, setTransferAccountNumber] = useState('')
   const [transferAccountName, setTransferAccountName] = useState('')
@@ -270,6 +397,17 @@ return savedPage === 'store' ? 'store' : 'landing'
   ]
    // ==================================
   const [activeTab, setActiveTab] = useState<CustomerTab>('home')
+
+  // STATE MASA AKTIF KARTU PELANGGAN
+  const [validityPackages, setValidityPackages] = useState<ValidityPackage[]>([])
+  const [validityRequests, setValidityRequests] = useState<ValidityRequest[]>([])
+  const [validityOperator, setValidityOperator] = useState('Telkomsel')
+  const [validityNumber, setValidityNumber] = useState('')
+  const [selectedValidityPackage, setSelectedValidityPackage] = useState('')
+  const [validityLoading, setValidityLoading] = useState(false)
+  const [validitySubmitting, setValiditySubmitting] = useState(false)
+  const [validityMessage, setValidityMessage] = useState('')
+
   // State untuk Banner Bergulir
   const [currentBanner, setCurrentBanner] = useState(0)
   const banners = ['/images/banner1.jpg', '/images/banner2.jpg', '/images/banner3.jpg', '/images/banner4.jpg']
@@ -369,6 +507,34 @@ const [referralCode, setReferralCode] = useState('')
   const [adminWithdrawsLoading, setAdminWithdrawsLoading] = useState(false)
   const [adminWithdrawsMessage, setAdminWithdrawsMessage] = useState('')
   const [processingWithdrawId, setProcessingWithdrawId] = useState<string | null>(null)
+// ADMIN QRIS REQUEST STATE
+const [adminQrisRequests, setAdminQrisRequests] = useState<AdminQrisRequest[]>([])
+const [adminQrisLoading, setAdminQrisLoading] = useState(false)
+const [adminQrisMessage, setAdminQrisMessage] = useState('')
+const [processingQrisId, setProcessingQrisId] = useState<string | null>(null)
+
+// ADMIN MASA AKTIF KARTU STATE
+const [adminValidityRequests, setAdminValidityRequests] = useState<ValidityRequest[]>([])
+const [adminValidityLoading, setAdminValidityLoading] = useState(false)
+const [adminValidityMessage, setAdminValidityMessage] = useState('')
+const [processingValidityId, setProcessingValidityId] = useState<string | null>(null)
+
+
+// ADMIN MASA AKTIF: PENGELOLAAN PAKET
+const [adminValidityPackages, setAdminValidityPackages] = useState<ValidityPackage[]>([])
+const [validityPackagesLoading, setValidityPackagesLoading] = useState(false)
+const [validityPackagesMessage, setValidityPackagesMessage] = useState('')
+const [validityPackageFormError, setValidityPackageFormError] = useState('')
+const [showValidityPackageForm, setShowValidityPackageForm] = useState(false)
+const [editingValidityPackageId, setEditingValidityPackageId] = useState<string | null>(null)
+const [savingValidityPackage, setSavingValidityPackage] = useState(false)
+
+const [validityPackageForm, setValidityPackageForm] = useState({
+  operator: 'Telkomsel',
+  package_name: '',
+  duration_days: '',
+  price: '',
+})
 
   const [adminUsers, setAdminUsers] = useState<{ id: string; phone: string; full_name: string | null; balance: number; points: number; is_active: boolean; created_at: string }[]>([])
   const [adminUsersLoading, setAdminUsersLoading] = useState(false)
@@ -395,13 +561,48 @@ const [referralCode, setReferralCode] = useState('')
   const [variantFormProductId, setVariantFormProductId] = useState<string | null>(null)
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
   const [variantForm, setVariantForm] = useState({ variant_name: '', code: '', description: '', cost_price: '', selling_price: '' })
+  const [variantFormOperator, setVariantFormOperator] = useState('TELKOMSEL')
+  const variantFormCodePreview = `${({
+  TELKOMSEL: 'TSEL_DATA_',
+  XL: 'XL_DATA_',
+  AXIS: 'AXIS_DATA_',
+  INDOSAT: 'INDOSAT_DATA_',
+  SMARTFREN: 'SMARTFREN_DATA_',
+  TRI: 'TRI_DATA_',
+}[variantFormOperator] || 'TSEL_DATA_')}${variantForm.variant_name.trim().toUpperCase()
+  .replace(/\bINTERNET\b/g, '')
+  .replace(/(\d+)\s*GB\b/g, '$1GB')
+  .replace(/(\d+)\s*MB\b/g, '$1MB')
+  .replace(/(\d+)\s*HARI\b/g, '$1D')
+  .replace(/(\d+)\s*JAM\b/g, '$1H')
+  .replace(/[^A-Z0-9]+/g, '_')
+  .replace(/^_+|_+$/g, '')}`
   const [savingVariant, setSavingVariant] = useState(false)
   const [variantFormError, setVariantFormError] = useState('')
 
   const selectedProduct = products.find((p) => p.id === selectedProductId) || null
   const activeVariants = selectedProduct ? selectedProduct.variants.filter((v) => v.selling_price > 0) : []
-  const selectedVariant = activeVariants.find((v) => v.id === selectedVariantId) || null
-  const productHasVariants = activeVariants.length > 0
+  const isDataProduct = String(selectedProduct?.code || '').toUpperCase() === 'DATA'
+const dataOperatorOptions = [
+  { code: 'TELKOMSEL', label: 'Telkomsel' },
+  { code: 'XL', label: 'XL' },
+  { code: 'AXIS', label: 'AXIS' },
+  { code: 'INDOSAT', label: 'Indosat' },
+  { code: 'SMARTFREN', label: 'Smartfren' },
+  { code: 'TRI', label: 'Tri' },
+]
+const detectedDataOperator = isDataProduct ? detectDataOperator(phone) : ''
+const currentDataOperator = selectedDataOperator || detectedDataOperator
+const visibleVariants = isDataProduct
+  ? activeVariants.filter((variant) => {
+      const code = String(variant.code || '').toUpperCase()
+      return currentDataOperator === 'TELKOMSEL'
+        ? code.startsWith('TSEL_DATA_') || code.startsWith('SEL_DATA_')
+        : code.startsWith(`${currentDataOperator}_DATA_`)
+    })
+  : activeVariants
+  const selectedVariant = visibleVariants.find((v) => v.id === selectedVariantId) || null
+const productHasVariants = visibleVariants.length > 0
   const isBankTransferProduct = String(selectedProduct?.code || '').toUpperCase() === 'BANKTRANSFER'
   const customTransferAmount = Number(transferAmount)
   const isLoggedIn = Boolean(userToken && userProfile)
@@ -594,10 +795,67 @@ const [referralCode, setReferralCode] = useState('')
     } finally { setUserOrdersLoading(false) }
   }
 
+    // MEMUAT PAKET MASA AKTIF KARTU
+  async function loadValidityPackages() {
+    setValidityLoading(true)
+    setValidityMessage('')
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/validity/packages?operator=${encodeURIComponent(validityOperator)}`
+      )
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Gagal mengambil paket masa aktif.')
+      }
+
+      setValidityPackages(Array.isArray(data.packages) ? data.packages : [])
+    } catch (error) {
+      setValidityMessage(error instanceof Error ? error.message : 'Tidak dapat terhubung ke server.')
+    } finally {
+      setValidityLoading(false)
+    }
+  }
+
+  // MEMUAT RIWAYAT PENGAJUAN MASA AKTIF
+  async function loadValidityRequests() {
+    if (!userToken) {
+      setValidityRequests([])
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/users/validity-requests`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      })
+      const data = await response.json()
+
+      if (response.status === 401) {
+        localStorage.removeItem(USER_TOKEN_KEY)
+        setUserToken(null)
+        setUserProfile(null)
+        setValidityMessage('Sesi login kedaluwarsa. Silakan login kembali.')
+        return
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Gagal mengambil riwayat masa aktif.')
+      }
+
+      setValidityRequests(Array.isArray(data.requests) ? data.requests : [])
+    } catch (error) {
+      setValidityMessage(error instanceof Error ? error.message : 'Tidak dapat terhubung ke server.')
+    }
+  }
   useEffect(() => {
     if (activeTab === 'orders' && isLoggedIn) loadUserOrders()
     if (activeTab === 'account' && isLoggedIn) { loadUserBalance(); loadMission(); loadMissionLevel2() }
         if (activeTab === 'home' && isLoggedIn) { loadRewards() }
+            if (activeTab === 'validity' && isLoggedIn) {
+      loadValidityPackages()
+      loadValidityRequests()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isLoggedIn])
 
@@ -705,6 +963,392 @@ const [referralCode, setReferralCode] = useState('')
       if (response.ok && data.success) setAdminWithdraws(data.withdraws || [])
     } catch { /* abaikan */ } finally { setAdminWithdrawsLoading(false) }
   }
+  async function loadAdminQrisRequests() {
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  setAdminQrisLoading(true)
+  setAdminQrisMessage('')
+
+  try {
+    const response = await fetch(`${API_URL}/api/admin/qris-requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal mengambil pengajuan QRIS.')
+    }
+
+    setAdminQrisRequests(data.requests || [])
+  } catch (error) {
+    setAdminQrisMessage(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  } finally {
+    setAdminQrisLoading(false)
+  }
+}
+
+
+async function loadAdminValidityRequests() {
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  setAdminValidityLoading(true)
+  setAdminValidityMessage('')
+
+  try {
+    const response = await fetch(`${API_URL}/api/admin/validity-requests`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal mengambil pengajuan masa aktif.')
+    }
+
+    setAdminValidityRequests(data.requests || [])
+  } catch (error) {
+    setAdminValidityMessage(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  } finally {
+    setAdminValidityLoading(false)
+  }
+}
+
+async function loadAdminValidityPackages() {
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  setValidityPackagesLoading(true)
+  setValidityPackagesMessage('')
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/admin/validity/packages`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal mengambil paket masa aktif.')
+    }
+
+    setAdminValidityPackages(data.packages || [])
+  } catch (error) {
+    setValidityPackagesMessage(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  } finally {
+    setValidityPackagesLoading(false)
+  }
+}
+
+function openCreateValidityPackage() {
+  setEditingValidityPackageId(null)
+  setValidityPackageForm({
+    operator: 'Telkomsel',
+    package_name: '',
+    duration_days: '',
+    price: '',
+  })
+  setValidityPackageFormError('')
+  setShowValidityPackageForm(true)
+}
+
+function openEditValidityPackage(pkg: ValidityPackage) {
+  setEditingValidityPackageId(pkg.id)
+  setValidityPackageForm({
+    operator: pkg.operator,
+    package_name: pkg.package_name,
+    duration_days: String(pkg.duration_days),
+    price: String(pkg.price),
+  })
+  setValidityPackageFormError('')
+  setShowValidityPackageForm(true)
+}
+
+function resetValidityPackageForm() {
+  setShowValidityPackageForm(false)
+  setEditingValidityPackageId(null)
+  setValidityPackageFormError('')
+  setValidityPackageForm({
+    operator: 'Telkomsel',
+    package_name: '',
+    duration_days: '',
+    price: '',
+  })
+}
+
+async function handleSaveValidityPackage(e: FormEvent<HTMLFormElement>) {
+  e.preventDefault()
+
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  const durationDays = Number(validityPackageForm.duration_days)
+  const price = Number(validityPackageForm.price)
+
+  if (!validityPackageForm.package_name.trim()) {
+    setValidityPackageFormError('Nama paket wajib diisi.')
+    return
+  }
+
+  if (!Number.isSafeInteger(durationDays) || durationDays <= 0) {
+    setValidityPackageFormError('Durasi harus berupa bilangan bulat lebih dari 0.')
+    return
+  }
+
+  if (!Number.isSafeInteger(price) || price <= 0) {
+    setValidityPackageFormError('Harga harus berupa bilangan bulat lebih dari 0.')
+    return
+  }
+
+  setSavingValidityPackage(true)
+  setValidityPackageFormError('')
+  setValidityPackagesMessage('')
+
+  try {
+    const isEditing = Boolean(editingValidityPackageId)
+
+    const response = await fetch(
+      isEditing
+        ? `${API_URL}/api/admin/validity/packages/${editingValidityPackageId}`
+        : `${API_URL}/api/admin/validity/packages`,
+      {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          operator: validityPackageForm.operator,
+          package_name: validityPackageForm.package_name.trim(),
+          duration_days: durationDays,
+          price,
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal menyimpan paket.')
+    }
+
+    setValidityPackagesMessage(
+      isEditing ? 'Paket berhasil diperbarui.' : 'Paket berhasil ditambahkan.'
+    )
+
+    resetValidityPackageForm()
+    await loadAdminValidityPackages()
+  } catch (error) {
+    setValidityPackageFormError(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  } finally {
+    setSavingValidityPackage(false)
+  }
+}
+
+async function handleToggleValidityPackage(pkg: ValidityPackage) {
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  const nextStatus = !pkg.is_active
+
+  const confirmation = window.confirm(
+    `Apakah Anda yakin ingin ${nextStatus ? 'mengaktifkan' : 'menonaktifkan'} paket ${pkg.package_name}?`
+  )
+
+  if (!confirmation) return
+
+  setValidityPackagesMessage('')
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/admin/validity/packages/${pkg.id}/status`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          is_active: nextStatus,
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal mengubah status paket.')
+    }
+
+    setValidityPackagesMessage(
+      `Paket berhasil ${nextStatus ? 'diaktifkan' : 'dinonaktifkan'}.`
+    )
+
+    await loadAdminValidityPackages()
+  } catch (error) {
+    setValidityPackagesMessage(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  }
+}
+
+
+async function handleProcessQrisRequest(
+  id: string,
+  action: 'complete' | 'reject'
+) {
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  if (action === 'complete') {
+    const confirmed = window.confirm(
+      'PERHATIAN: Apakah Anda sudah benar-benar membayar merchant melalui QRIS? Saldo pelanggan sudah ditahan saat pengajuan. Pengajuan akan ditandai selesai.'
+    )
+    if (!confirmed) return
+  }
+
+  const adminNotes = window.prompt(
+    action === 'complete'
+      ? 'Masukkan catatan konfirmasi pembayaran merchant:'
+      : 'Masukkan alasan penolakan pengajuan:'
+  )
+
+  if (adminNotes === null) return
+
+  if (action === 'complete' && !adminNotes.trim()) {
+    alert('Catatan konfirmasi pembayaran wajib diisi.')
+    return
+  }
+
+  if (action === 'reject' && !window.confirm(
+    'Tolak pengajuan ini dan kembalikan saldo pelanggan?'
+  )) return
+
+  setProcessingQrisId(id)
+  setAdminQrisMessage('')
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/admin/qris-requests/${encodeURIComponent(id)}/process`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action,
+          admin_notes: adminNotes.trim(),
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal memproses pengajuan QRIS.')
+    }
+
+    setAdminQrisMessage(data.message || 'Pengajuan berhasil diproses.')
+    await loadAdminQrisRequests()
+    await loadAdminUsers()
+  } catch (error) {
+    setAdminQrisMessage(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  } finally {
+    setProcessingQrisId(null)
+  }
+}
+
+async function handleProcessValidityRequest(
+  id: string,
+  action: 'processing' | 'complete' | 'reject'
+) {
+  const token = sessionStorage.getItem('digitalku_admin_token')
+  if (!token) return
+
+  const actionLabels = {
+    processing: 'memproses pengajuan ini',
+    complete: 'menyelesaikan pengajuan ini',
+    reject: 'menolak pengajuan ini dan mengembalikan saldo pelanggan',
+  }
+
+  if (!window.confirm(`Apakah Anda yakin ingin ${actionLabels[action]}?`)) {
+    return
+  }
+
+  const adminNotes = window.prompt(
+    action === 'complete'
+      ? 'Masukkan catatan penyelesaian (wajib):'
+      : 'Masukkan catatan admin (opsional):'
+  )
+
+  if (adminNotes === null) return
+
+  if (action === 'complete' && !adminNotes.trim()) {
+    alert('Catatan penyelesaian wajib diisi.')
+    return
+  }
+
+  setProcessingValidityId(id)
+  setAdminValidityMessage('')
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/admin/validity-requests/${id}/process`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action,
+          admin_notes: adminNotes.trim(),
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Gagal memproses pengajuan.')
+    }
+
+    setAdminValidityMessage(data.message || 'Pengajuan berhasil diperbarui.')
+
+    await loadAdminValidityRequests()
+
+    if (action === 'reject') {
+      await loadAdminUsers()
+    }
+  } catch (error) {
+    setAdminValidityMessage(
+      error instanceof Error ? error.message : 'Terjadi kesalahan.'
+    )
+  } finally {
+    setProcessingValidityId(null)
+  }
+}
+
 
   async function handleProcessWithdraw(id: string, action: 'approve' | 'reject') {
     const token = sessionStorage.getItem('digitalku_admin_token')
@@ -760,17 +1404,36 @@ const [referralCode, setReferralCode] = useState('')
     } catch (error) { setResetPasswordMessage(error instanceof Error ? error.message : 'Terjadi kesalahan.')
     } finally { setResettingPassword(false) }
   }
-
+useEffect(() => {
+  if (page === 'dashboard') {
+    loadAdminOrders(1)
+    loadAdminProducts()
+    loadAdminTopups()
+    loadAdminUsers()
+    loadAdminWithdraws()
+    loadAdminQrisRequests()
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [page])
   useEffect(() => {
-    if (page === 'dashboard') { loadAdminOrders(1); loadAdminProducts(); loadAdminTopups(); loadAdminUsers(); loadAdminWithdraws() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
-
-  useEffect(() => {
-    if (page === 'dashboard' && adminTab === 'users') { loadAdminUsers() }
-    if (page === 'dashboard' && adminTab === 'withdraws') { loadAdminWithdraws() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminTab, page])
+  if (page === 'dashboard' && adminTab === 'users') {
+    loadAdminUsers()
+  }
+  if (page === 'dashboard' && adminTab === 'withdraws') {
+    loadAdminWithdraws()
+  }
+  if (page === 'dashboard' && adminTab === 'qris') {
+    loadAdminQrisRequests()
+  }
+    if (page === 'dashboard' && adminTab === 'validity') {
+    loadAdminValidityRequests()
+  }
+  if (page === 'dashboard' && adminTab === 'validity') {
+  loadAdminValidityRequests()
+  loadAdminValidityPackages()
+}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [adminTab, page])
 
   async function refreshCustomerProducts() {
     try {
@@ -826,7 +1489,13 @@ const [referralCode, setReferralCode] = useState('')
   }
 
   function resetVariantForm() { setVariantForm({ variant_name: '', code: '', description: '', cost_price: '', selling_price: '' }); setEditingVariantId(null); setVariantFormProductId(null); setVariantFormError('') }
-  function openCreateVariant(productId: string) { setVariantForm({ variant_name: '', code: '', description: '', cost_price: '', selling_price: '' }); setEditingVariantId(null); setVariantFormProductId(productId); setVariantFormError('') }
+  function openCreateVariant(productId: string) {
+  setVariantForm({ variant_name: '', code: '', description: '', cost_price: '', selling_price: '' })
+  setVariantFormOperator('TELKOMSEL')
+  setEditingVariantId(null)
+  setVariantFormProductId(productId)
+  setVariantFormError('')
+}
   function openEditVariant(productId: string, variant: AdminVariant) { setVariantForm({ variant_name: variant.variant_name, code: variant.code, description: variant.description || '', cost_price: String(variant.cost_price), selling_price: String(variant.selling_price) }); setEditingVariantId(variant.id); setVariantFormProductId(productId); setVariantFormError('') }
 
   async function handleSaveVariant(event: FormEvent<HTMLFormElement>) {
@@ -838,7 +1507,44 @@ const [referralCode, setReferralCode] = useState('')
     try {
       const isEdit = Boolean(editingVariantId)
       const url = isEdit ? `${API_URL}/api/admin/variants/${encodeURIComponent(editingVariantId as string)}` : `${API_URL}/api/admin/variants`
-      const body: Record<string, unknown> = { variant_name: variantForm.variant_name.trim(), code: variantForm.code.trim().toUpperCase(), description: variantForm.description.trim(), cost_price: Number(variantForm.cost_price || 0), selling_price: Number(variantForm.selling_price || 0) }
+      const targetProduct = adminProducts.find((p) => p.id === variantFormProductId)
+const isDataVariant = String(targetProduct?.code || '').toUpperCase() === 'DATA'
+
+const operatorPrefixes: Record<string, string> = {
+  TELKOMSEL: 'TSEL_DATA_',
+  XL: 'XL_DATA_',
+  AXIS: 'AXIS_DATA_',
+  INDOSAT: 'INDOSAT_DATA_',
+  SMARTFREN: 'SMARTFREN_DATA_',
+  TRI: 'TRI_DATA_',
+}
+
+const generatedSuffix = variantForm.variant_name.trim().toUpperCase()
+  .replace(/\bINTERNET\b/g, '')
+  .replace(/(\d+)\s*GB\b/g, '$1GB')
+  .replace(/(\d+)\s*MB\b/g, '$1MB')
+  .replace(/(\d+)\s*HARI\b/g, '$1D')
+  .replace(/(\d+)\s*JAM\b/g, '$1H')
+  .replace(/[^A-Z0-9]+/g, '_')
+  .replace(/^_+|_+$/g, '')
+
+if (isDataVariant && !isEdit && !generatedSuffix) {
+  setVariantFormError('Nama paket belum dapat dijadikan kode otomatis.')
+  setSavingVariant(false)
+  return
+}
+
+const generatedCode = isDataVariant && !isEdit
+  ? `${operatorPrefixes[variantFormOperator] || 'TSEL_DATA_'}${generatedSuffix}`
+  : variantForm.code.trim().toUpperCase()
+
+const body: Record<string, unknown> = {
+  variant_name: variantForm.variant_name.trim(),
+  code: generatedCode,
+  description: variantForm.description.trim(),
+  cost_price: Number(variantForm.cost_price || 0),
+  selling_price: Number(variantForm.selling_price || 0),
+}
       if (!isEdit) body.product_id = variantFormProductId
       if (isEdit) { const current = adminProducts.find((p) => p.id === variantFormProductId)?.variants.find((v) => v.id === editingVariantId); body.is_active = current ? current.is_active : true }
       const response = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
@@ -926,8 +1632,22 @@ const [referralCode, setReferralCode] = useState('')
     if (!isLoggedIn || !userToken) { setUserFormError(''); setUserAuthMode('login'); setUserPage('login'); return }
     if (productsLoading) { setMessage('Sedang mengambil daftar layanan.'); return }
     if (!selectedProduct) { setMessage('Pilih layanan.'); return }
-    if (!isBankTransferProduct && !productHasVariants) { setMessage('Produk belum tersedia.'); return }
-    if (!isBankTransferProduct && !selectedVariant) { setMessage('Pilih varian.'); return }
+    if (!isBankTransferProduct && isDataProduct && !phone.trim()) {
+  setMessage('Masukkan nomor HP terlebih dahulu.')
+  return
+}
+if (!isBankTransferProduct && isDataProduct && !currentDataOperator) {
+  setMessage('Pilih operator Paket Data terlebih dahulu.')
+  return
+}
+if (!isBankTransferProduct && !productHasVariants) {
+  setMessage('Paket untuk operator ini belum tersedia.')
+  return
+}
+if (!isBankTransferProduct && !selectedVariant) {
+  setMessage('Pilih paket terlebih dahulu.')
+  return
+}
     if (isBankTransferProduct) {
       if (!transferBank || !transferAccountNumber.trim() || !transferAccountName.trim()) { setMessage('Lengkapi bank, nomor rekening, dan nama pemilik rekening.'); return }
       if (!Number.isSafeInteger(customTransferAmount) || customTransferAmount < 10000 || customTransferAmount > 1000000 || customTransferAmount % 1000 !== 0) { setMessage('Nominal transfer minimal Rp10.000, maksimal Rp1.000.000, dan kelipatan Rp1.000.'); return }
@@ -946,6 +1666,82 @@ const [referralCode, setReferralCode] = useState('')
       await loadUserOrders(); await loadUserBalance()
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Tidak dapat terhubung ke server.')
     } finally { setIsSubmitting(false) }
+  }
+
+  async function handleValidityOrder() {
+    setValidityMessage('')
+
+    if (!isLoggedIn || !userToken) {
+      setUserAuthMode('login')
+      setUserPage('login')
+      setUserFormError('')
+      return
+    }
+
+    if (!/^[0-9]{8,15}$/.test(validityNumber.trim())) {
+      setValidityMessage('Nomor kartu harus terdiri dari 8 sampai 15 angka.')
+      return
+    }
+
+    if (!selectedValidityPackage) {
+      setValidityMessage('Silakan pilih paket masa aktif terlebih dahulu.')
+      return
+    }
+
+    const selectedPackage = validityPackages.find(
+      (pkg) => pkg.id === selectedValidityPackage
+    )
+
+    if (!selectedPackage) {
+      setValidityMessage('Paket tidak ditemukan. Silakan pilih ulang.')
+      return
+    }
+
+    setValiditySubmitting(true)
+
+    try {
+      const response = await fetch(`${API_URL}/api/users/validity-requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userToken}`
+        },
+        body: JSON.stringify({
+          package_id: selectedValidityPackage,
+          destination_number: validityNumber.trim()
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        localStorage.removeItem(USER_TOKEN_KEY)
+        setUserToken(null)
+        setUserProfile(null)
+        throw new Error('Sesi login kedaluwarsa. Silakan login kembali.')
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Pengajuan masa aktif gagal.')
+      }
+
+      setUserBalance(Number(data.remaining_balance) || 0)
+      setValidityNumber('')
+      setSelectedValidityPackage('')
+      setValidityMessage(data.message || 'Pengajuan masa aktif berhasil dibuat.')
+
+      await loadValidityRequests()
+      await loadUserBalance()
+
+    } catch (error) {
+      setValidityMessage(
+        error instanceof Error
+          ? error.message
+          : 'Tidak dapat terhubung ke server.'
+      )
+    } finally {
+      setValiditySubmitting(false)
+    }
   }
 
   async function handleTrackOrder(event: FormEvent<HTMLFormElement>) {
@@ -999,7 +1795,7 @@ const [referralCode, setReferralCode] = useState('')
           <button type="button" onClick={() => { setPage('store'); setActiveTab('account') }} className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-700"><ArrowLeft size={18} />Kembali ke toko</button>
           <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-white"><LockKeyhole size={27} /></div>
           <h1 className="text-2xl font-extrabold text-slate-800">Login Admin</h1>
-          <p className="mt-2 text-sm text-slate-500">Masuk untuk mengelola layanan LukingzzStore.</p>
+          <p className="mt-2 text-sm text-slate-500">Masuk untuk mengelola layanan NEXIPAY.</p>
           <form onSubmit={handleAdminLogin} className="mt-7 space-y-4">
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">Username</label>
@@ -1012,7 +1808,7 @@ const [referralCode, setReferralCode] = useState('')
             {loginMessage && (<div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{loginMessage}</div>)}
             <button type="submit" disabled={isLoggingIn} className="w-full rounded-xl bg-blue-700 py-3.5 font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">{isLoggingIn ? 'Memeriksa...' : 'Masuk Admin'}</button>
           </form>
-          <p className="mt-6 text-center text-xs text-slate-400">LukingzzStore · Area administrator</p>
+          <p className="mt-6 text-center text-xs text-slate-400">NEXIPAY · Area administrator</p>
         </div>
       </div>
     )
@@ -1025,10 +1821,19 @@ const [referralCode, setReferralCode] = useState('')
           <div className="absolute inset-0 bg-blue-900/50 mix-blend-multiply"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-white/20 backdrop-blur-sm p-3"><LayoutDashboard size={24} /></div>
-                <div><h1 className="text-xl font-extrabold">LukingzzStore</h1><p className="text-xs text-blue-100">Dashboard Admin</p></div>
-              </div>
+              
+<div className="flex items-center gap-3">
+  <img
+    src="/images/nexipay-logo.png"
+    alt="Logo NEXIPAY"
+    className="h-12 w-12 rounded-xl object-cover object-[center_25%]"
+  />
+  <div>
+    <h1 className="text-xl font-extrabold">NEXIPAY</h1>
+    <p className="text-xs text-blue-100">Dashboard Admin</p>
+  </div>
+</div>
+
               <button type="button" onClick={handleAdminLogout} className="flex items-center gap-2 rounded-xl bg-white/20 backdrop-blur-sm px-3 py-2 text-sm font-semibold hover:bg-white/30"><LogOut size={17} />Keluar</button>
             </div>
             <div className="mt-7">
@@ -1045,6 +1850,36 @@ const [referralCode, setReferralCode] = useState('')
             <button type="button" onClick={() => setAdminTab('products')} className={`rounded-xl px-4 py-2 text-sm font-bold whitespace-nowrap transition ${adminTab === 'products' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>Produk</button>
             <button type="button" onClick={() => setAdminTab('users')} className={`rounded-xl px-4 py-2 text-sm font-bold whitespace-nowrap transition ${adminTab === 'users' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}>Pelanggan</button>
             <button type="button" onClick={() => setAdminTab('withdraws')} className={`rounded-xl px-4 py-2 text-sm font-bold whitespace-nowrap transition ${adminTab === 'withdraws' ? 'bg-rose-100 text-rose-700' : 'text-slate-500 hover:bg-slate-50'}`}>Withdraw</button>
+            <button
+  type="button"
+  onClick={() => setAdminTab('qris')}
+  className={`rounded-xl px-4 py-2 text-sm font-bold whitespace-nowrap transition ${
+    adminTab === 'qris'
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'text-slate-500 hover:bg-slate-50'
+  }`}
+>
+  <span className="inline-flex items-center gap-2">
+    <QrCode size={16} />
+    Pengajuan QRIS
+  </span>
+</button>
+
+<button
+  type="button"
+  onClick={() => setAdminTab('validity')}
+  className={`rounded-xl px-4 py-2 text-sm font-bold whitespace-nowrap transition ${
+    adminTab === 'validity'
+      ? 'bg-blue-100 text-blue-700'
+      : 'text-slate-500 hover:bg-slate-50'
+  }`}
+>
+  <span className="inline-flex items-center gap-2">
+    <Clock size={16} />
+    Masa Aktif
+  </span>
+</button>
+
           </div>
         </div>
 
@@ -1135,6 +1970,12 @@ const [referralCode, setReferralCode] = useState('')
                             <div className="border-t border-slate-100 p-4 bg-slate-50/50">
                               <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                                 <div><p className="text-[10px] text-slate-400">Layanan</p><p className="font-semibold">{order.product_name || order.product_code || '-'}</p></div>
+                                {(order.variant_name_snapshot || order.variant_code_snapshot) && (
+  <div>
+    <p className="text-[10px] text-slate-400">Paket / Varian</p>
+    <p className="font-semibold">{order.variant_name_snapshot || order.variant_code_snapshot}</p>
+  </div>
+)}
                                 <div><p className="text-[10px] text-slate-400">Nomor Tujuan</p><p className="font-semibold break-all">{order.destination_number}</p></div>
                                 <div><p className="text-[10px] text-slate-400">Nomor Pelanggan</p><p className="font-semibold">{order.customer_phone}</p></div>
                                 <div><p className="text-[10px] text-slate-400">Nama Pelanggan</p><p className="font-semibold">{order.customer_name || '-'}</p></div>
@@ -1260,6 +2101,526 @@ const [referralCode, setReferralCode] = useState('')
             </section>
           )}
 
+{adminTab === 'qris' && (
+  <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700">
+          <QrCode size={23} />
+        </div>
+        <div>
+          <h3 className="font-bold">Pengajuan Pembayaran QRIS</h3>
+          <p className="text-xs text-slate-500">
+            Periksa pengajuan pelanggan sebelum memproses pembayaran
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={loadAdminQrisRequests}
+        disabled={adminQrisLoading}
+        className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      >
+        <RefreshCw size={15} className={adminQrisLoading ? 'animate-spin' : ''} />
+        Muat Ulang
+      </button>
+    </div>
+
+    {adminQrisMessage && (
+      <div className="mb-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
+        {adminQrisMessage}
+      </div>
+    )}
+
+    {adminQrisLoading && (
+      <div className="py-8 text-center text-sm text-slate-500">
+        <RefreshCw size={22} className="mx-auto mb-2 animate-spin text-emerald-600" />
+        Mengambil pengajuan QRIS...
+      </div>
+    )}
+
+    {!adminQrisLoading && adminQrisRequests.length === 0 && (
+      <div className="mt-4 rounded-xl bg-slate-50 p-6 text-center">
+        <QrCode size={30} className="mx-auto mb-2 text-slate-300" />
+        <p className="text-sm font-semibold text-slate-600">
+          Belum ada pengajuan QRIS
+        </p>
+      </div>
+    )}
+
+    {!adminQrisLoading && adminQrisRequests.length > 0 && (
+      <div className="space-y-4">
+        {adminQrisRequests.map((request) => (
+          <div key={request.id} className="rounded-xl border border-slate-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+                Menunggu Pemeriksaan
+              </span>
+              <span className="text-xs text-slate-400">
+                {new Date(request.created_at).toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            <p className="text-xl font-extrabold text-emerald-700">
+              {formatRupiah(Number(request.amount))}
+            </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-slate-400">Pelanggan</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {request.full_name || 'Nama belum diisi'}
+                </p>
+                <p className="text-xs text-slate-600">{request.phone}</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400">Merchant QRIS</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {request.merchant_name}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {request.merchant_city || 'Kota tidak tersedia'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400">Saldo pelanggan saat ini</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {formatRupiah(Number(request.balance))}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400">Catatan pelanggan</p>
+                <p className="whitespace-pre-wrap text-sm text-slate-700">
+                  {request.customer_note || 'Tidak ada catatan'}
+                </p>
+              </div>
+            </div>
+
+            
+<QrisBarcode payload={request.qris_payload} />
+
+<details className="mt-4 rounded-lg bg-slate-50 p-3">
+  <summary className="cursor-pointer text-xs font-bold text-slate-600">
+    Lihat data QRIS
+  </summary>
+  <p className="mt-2 break-all text-xs text-slate-500">
+    {request.qris_payload}
+  </p>
+</details>
+
+
+            <p className="mt-3 text-xs text-amber-700">
+              Periksa QRIS dan pastikan pembayaran merchant benar-benar sudah dilakukan sebelum menyelesaikan pengajuan.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+  <button
+    type="button"
+    onClick={() => handleProcessQrisRequest(request.id, 'complete')}
+    disabled={processingQrisId === request.id}
+    className="rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+  >
+    {processingQrisId === request.id ? 'Memproses...' : '✓ Selesaikan'}
+  </button>
+
+  <button
+    type="button"
+    onClick={() => handleProcessQrisRequest(request.id, 'reject')}
+    disabled={processingQrisId === request.id}
+    className="rounded-xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+  >
+    {processingQrisId === request.id ? 'Memproses...' : '✗ Tolak'}
+  </button>
+</div>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+)}
+
+{adminTab === 'validity' && (
+  <section className="mb-5 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h3 className="font-bold text-slate-800">Katalog Paket Masa Aktif</h3>
+        <p className="text-xs text-slate-500">
+          Atur paket, durasi, harga, dan status untuk setiap operator
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={openCreateValidityPackage}
+        className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+      >
+        <Plus size={15} />
+        Tambah Paket
+      </button>
+    </div>
+
+    {validityPackagesMessage && (
+      <div className="mb-3 rounded-xl bg-blue-50 p-3 text-xs text-blue-700">
+        {validityPackagesMessage}
+      </div>
+    )}
+
+    {showValidityPackageForm && (
+      <form
+        onSubmit={handleSaveValidityPackage}
+        className="mb-5 space-y-3 rounded-xl border border-blue-100 bg-blue-50/50 p-4"
+      >
+        <h4 className="font-bold text-slate-800">
+          {editingValidityPackageId ? 'Edit Paket' : 'Tambah Paket Baru'}
+        </h4>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold">Operator</label>
+          <select
+            value={validityPackageForm.operator}
+            onChange={(e) =>
+              setValidityPackageForm({
+                ...validityPackageForm,
+                operator: e.target.value,
+              })
+            }
+            className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+          >
+            {['Telkomsel', 'Indosat', 'XL', 'Tri', 'Axis', 'Smartfren'].map((operator) => (
+              <option key={operator} value={operator}>{operator}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold">Nama Paket</label>
+          <input
+            type="text"
+            value={validityPackageForm.package_name}
+            onChange={(e) =>
+              setValidityPackageForm({
+                ...validityPackageForm,
+                package_name: e.target.value,
+              })
+            }
+            maxLength={100}
+            placeholder="Contoh: Masa Aktif 30 Hari"
+            className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold">Durasi (hari)</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={validityPackageForm.duration_days}
+              onChange={(e) =>
+                setValidityPackageForm({
+                  ...validityPackageForm,
+                  duration_days: e.target.value,
+                })
+              }
+              placeholder="30"
+              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold">Harga Jual (Rp)</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={validityPackageForm.price}
+              onChange={(e) =>
+                setValidityPackageForm({
+                  ...validityPackageForm,
+                  price: e.target.value,
+                })
+              }
+              placeholder="10000"
+              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+            />
+          </div>
+        </div>
+
+        {validityPackageFormError && (
+          <p className="rounded-lg bg-red-50 p-3 text-xs text-red-600">
+            {validityPackageFormError}
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={savingValidityPackage}
+            className="rounded-xl bg-blue-600 px-5 py-3 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {savingValidityPackage ? 'Menyimpan...' : 'Simpan Paket'}
+          </button>
+
+          <button
+            type="button"
+            onClick={resetValidityPackageForm}
+            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          >
+            Batal
+          </button>
+        </div>
+      </form>
+    )}
+
+    {validityPackagesLoading ? (
+      <p className="py-6 text-center text-sm text-slate-500">
+        Memuat katalog paket...
+      </p>
+    ) : adminValidityPackages.length === 0 ? (
+      <div className="rounded-xl bg-slate-50 p-6 text-center">
+        <Package size={28} className="mx-auto mb-2 text-slate-300" />
+        <p className="text-sm font-semibold text-slate-600">
+          Belum ada paket masa aktif
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          Tambahkan paket setelah memastikan produk dan harganya.
+        </p>
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {adminValidityPackages.map((pkg) => (
+          <div
+            key={pkg.id}
+            className="rounded-xl border border-slate-200 p-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-blue-600">{pkg.operator}</p>
+                <p className="mt-1 font-bold text-slate-800">{pkg.package_name}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Durasi: {pkg.duration_days} hari
+                </p>
+                <p className="mt-2 font-extrabold text-blue-700">
+                  {formatRupiah(Number(pkg.price))}
+                </p>
+                <span className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-bold ${
+                  pkg.is_active
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {pkg.is_active ? 'Aktif' : 'Nonaktif'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => openEditValidityPackage(pkg)}
+                  className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <Pencil size={13} /> Edit
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleValidityPackage(pkg)}
+                  className={`rounded-lg px-3 py-2 text-xs font-bold ${
+                    pkg.is_active
+                      ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                >
+                  {pkg.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+)}
+
+{adminTab === 'validity' && (
+  <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
+          <Clock size={23} />
+        </div>
+        <div>
+          <h3 className="font-bold">Pengajuan Masa Aktif Kartu</h3>
+          <p className="text-xs text-slate-500">
+            Kelola dan proses permintaan pelanggan secara manual
+          </p>
+        </div>
+      </div>
+
+
+      <button
+        type="button"
+        onClick={loadAdminValidityRequests}
+        disabled={adminValidityLoading}
+        className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+      >
+        <RefreshCw size={15} className={adminValidityLoading ? 'animate-spin' : ''} />
+        Muat Ulang
+      </button>
+    </div>
+
+    {adminValidityMessage && (
+      <div className="mb-3 rounded-xl bg-blue-50 p-3 text-xs text-blue-700">
+        {adminValidityMessage}
+      </div>
+    )}
+
+    {adminValidityLoading && (
+      <div className="py-8 text-center text-sm text-slate-500">
+        <RefreshCw size={22} className="mx-auto mb-2 animate-spin text-blue-600" />
+        Mengambil pengajuan masa aktif...
+      </div>
+    )}
+
+    {!adminValidityLoading && adminValidityRequests.length === 0 && (
+      <div className="mt-4 rounded-xl bg-slate-50 p-6 text-center">
+        <Clock size={30} className="mx-auto mb-2 text-slate-300" />
+        <p className="text-sm font-semibold text-slate-600">
+          Belum ada pengajuan masa aktif
+        </p>
+      </div>
+    )}
+
+    {!adminValidityLoading && adminValidityRequests.length > 0 && (
+      <div className="space-y-4">
+        {adminValidityRequests.map((request) => (
+          <div key={request.id} className="rounded-xl border border-slate-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                request.status === 'pending'
+                  ? 'bg-amber-100 text-amber-700'
+                  : request.status === 'processing'
+                    ? 'bg-blue-100 text-blue-700'
+                    : request.status === 'completed'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-red-100 text-red-700'
+              }`}>
+                {request.status === 'pending'
+                  ? 'Menunggu Proses'
+                  : request.status === 'processing'
+                    ? 'Sedang Diproses'
+                    : request.status === 'completed'
+                      ? 'Selesai'
+                      : 'Ditolak'}
+              </span>
+
+              <span className="text-xs text-slate-400">
+                {new Date(request.created_at).toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            <p className="text-xl font-extrabold text-blue-700">
+              {formatRupiah(Number(request.price))}
+            </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-slate-400">Pelanggan</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {request.full_name || 'Nama belum diisi'}
+                </p>
+                <p className="text-xs text-slate-600">{request.phone}</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400">Operator</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {request.operator}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400">Nomor tujuan</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {request.destination_number}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400">Paket masa aktif</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {request.package_name}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {request.duration_days} hari
+                </p>
+              </div>
+            </div>
+
+            {request.admin_notes && (
+              <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                <p className="text-xs font-bold text-slate-500">Catatan admin</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                  {request.admin_notes}
+                </p>
+              </div>
+            )}
+
+            {request.status === 'pending' && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleProcessValidityRequest(request.id, 'processing')}
+                  disabled={processingValidityId === request.id}
+                  className="rounded-xl bg-blue-600 py-3 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Mulai Proses
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleProcessValidityRequest(request.id, 'reject')}
+                  disabled={processingValidityId === request.id}
+                  className="rounded-xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Tolak & Refund
+                </button>
+              </div>
+            )}
+
+            {request.status === 'processing' && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleProcessValidityRequest(request.id, 'complete')}
+                  disabled={processingValidityId === request.id}
+                  className="rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Selesaikan
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleProcessValidityRequest(request.id, 'reject')}
+                  disabled={processingValidityId === request.id}
+                  className="rounded-xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Tolak & Refund
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+)}
+
+
                    {adminTab === 'products' && (
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1356,7 +2717,7 @@ const [referralCode, setReferralCode] = useState('')
                             <span className="text-sm font-bold text-slate-800">Daftar Harga ({product.variants.length} Varian)</span>
                           </div>
                           <span className="text-xs font-bold text-indigo-600">
-                            {expandedProductId === product.id ? '▲ Tutup' : '▼ Buka'}
+                            {expandedProductId === product.id ? 'â–² Tutup' : 'â–¼ Buka'}
                           </span>
                         </button>
 
@@ -1402,13 +2763,40 @@ const [referralCode, setReferralCode] = useState('')
                             <button type="button" onClick={resetVariantForm} className="rounded-lg p-1 text-indigo-700 hover:bg-indigo-100"><X size={18} /></button>
                           </div>
                           <form onSubmit={handleSaveVariant} className="mt-3 space-y-3">
+                            {String(product.code || '').toUpperCase() === 'DATA' && (
+  <div>
+    <label className="mb-1 block text-xs font-semibold text-slate-700">
+      Pilih operator
+    </label>
+    <select
+      value={variantFormOperator}
+      onChange={(e) => setVariantFormOperator(e.target.value)}
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+    >
+      {dataOperatorOptions.map((operator) => (
+        <option key={operator.code} value={operator.code}>
+          {operator.label}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
                             <div>
                               <label className="mb-1 block text-xs font-semibold text-slate-700">Nama varian</label>
                               <input type="text" value={variantForm.variant_name} onChange={(e) => setVariantForm((p) => ({ ...p, variant_name: e.target.value }))} placeholder="Contoh: 10.000" required maxLength={150} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
                             </div>
                             <div>
                               <label className="mb-1 block text-xs font-semibold text-slate-700">Kode varian</label>
-                              <input type="text" value={variantForm.code} onChange={(e) => setVariantForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="Contoh: TSEL10K" required maxLength={100} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm uppercase outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+                              {String(product.code || '').toUpperCase() === 'DATA' && !editingVariantId ? (
+  <div className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+    <p className="break-all font-mono text-sm font-bold text-indigo-700">
+      {variantForm.variant_name.trim() ? variantFormCodePreview : 'Kode dibuat otomatis setelah nama paket diisi'}
+    </p>
+    <p className="mt-1 text-[10px] text-indigo-500">Kode otomatis berdasarkan operator dan nama paket</p>
+  </div>
+) : (
+  <input type="text" value={variantForm.code} onChange={(e) => setVariantForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="Contoh: TSEL10K" required maxLength={100} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-mono text-sm uppercase outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+)}
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
@@ -1550,10 +2938,10 @@ const [referralCode, setReferralCode] = useState('')
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
             <div className="flex items-start gap-3">
               <ShieldCheck size={22} className="mt-0.5 shrink-0 text-blue-700" />
-              <div><h3 className="text-sm font-bold text-blue-800">Pemeriksaan pembayaran manual</h3><p className="mt-1 text-xs leading-5 text-blue-700">LukingzzStore belum terhubung otomatis ke sistem DANA. Verifikasi hanya dilakukan setelah admin memastikan transaksi benar-benar masuk melalui riwayat resmi DANA Bisnis.</p></div>
+              <div><h3 className="text-sm font-bold text-blue-800">Pemeriksaan pembayaran manual</h3><p className="mt-1 text-xs leading-5 text-blue-700">NEXIPAY belum terhubung otomatis ke sistem DANA. Verifikasi hanya dilakukan setelah admin memastikan transaksi benar-benar masuk melalui riwayat resmi DANA Bisnis.</p></div>
             </div>
           </section>
-          <p className="pb-5 text-center text-xs text-slate-400">LukingzzStore · Dashboard administrator</p>
+          <p className="pb-5 text-center text-xs text-slate-400">NEXIPAY · Dashboard administrator</p>
         </main>
       </div>
     )
@@ -1565,11 +2953,17 @@ const [referralCode, setReferralCode] = useState('')
       <div className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
         <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
           <button type="button" onClick={() => { setUserPage('main'); setUserFormError('') }} className="mb-7 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-700"><ArrowLeft size={18} />Kembali ke toko</button>
-          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-white">
-            {isRegister ? <UserPlus size={27} /> : <LockKeyhole size={27} />}
-          </div>
+         
+<div className="mb-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl">
+  <img
+    src="/images/nexipay-logo.png"
+    alt="Logo NEXIPAY"
+    className="h-full w-full object-cover object-[center_25%]"
+  />
+</div>
+
           <h1 className="text-2xl font-extrabold text-slate-800">{isRegister ? 'Daftar Akun' : 'Login Pelanggan'}</h1>
-          <p className="mt-2 text-sm text-slate-500">{isRegister ? 'Buat akun untuk mulai memesan di LukingzzStore.' : 'Masuk untuk memesan dan melihat riwayat.'}</p>
+          <p className="mt-2 text-sm text-slate-500">{isRegister ? 'Buat akun untuk mulai memesan di NEXIPAY.' : 'Masuk untuk memesan dan melihat riwayat.'}</p>
           <form onSubmit={isRegister ? handleUserRegister : handleUserLogin} className="mt-7 space-y-4">
             {isRegister && (
               <div>
@@ -1619,9 +3013,8 @@ const groupedProducts: Record<CategoryName, ApiProduct[]> = {
   'E-Wallet': [],
   Pulsa: [],
   Game: [],
-     'Layanan Lainnya': [],
+  'Layanan Lainnya': [],
 }
-
   
 for (const product of products) {
   const category = getCategoryForProduct(product)
@@ -1648,7 +3041,7 @@ for (const product of products) {
   }}
   className="bg-gray-800 text-white px-6 py-2 rounded-full text-sm font-semibold"
 >
-  ⬅️ Kembali ke Toko
+  â¬…ï¸ Kembali ke Toko
 </button>
         </div>
       </div>
@@ -1697,7 +3090,7 @@ for (const product of products) {
   className="fixed bottom-24 right-4 z-50 bg-gradient-to-r from-amber-500 to-red-500 text-white p-4 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"
   title="LUCKY SPIN"
 >
-  <span className="text-3xl">🎰</span>
+  <span className="text-3xl">&#127922;</span>
 </button>
       {/* ======================= */}
       <div className="relative mx-auto min-h-screen max-w-md bg-slate-50 shadow-xl">
@@ -1706,24 +3099,42 @@ for (const product of products) {
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="rounded-xl bg-white/20 backdrop-blur-sm p-2"><Wallet size={23} /></div>
-                <div><h1 className="text-xl font-extrabold tracking-wide">LukingzzStore</h1><p className="text-xs text-blue-100">Toko saldo digital</p></div>
+                
+<div className="flex items-center gap-3">
+  <img
+    src="/images/nexipay-logo.png"
+    alt="Logo NEXIPAY"
+    className="h-12 w-12 rounded-xl object-cover object-[center_25%]"
+  />
+  <div>
+    <h1 className="text-xl font-extrabold tracking-wide">NEXIPAY</h1>
+    <p className="text-xs text-blue-100">
+      SMART DIGITAL PAYMENT
+    </p>
+  </div>
+</div>
+
+                
               </div>
               <button type="button" aria-label="Notifikasi" onClick={() => setActiveTab('orders')} className="rounded-full bg-white/20 backdrop-blur-sm p-2"><Bell size={20} /></button>
             </div>
             <div className="mt-7">
-              <p className="text-sm text-blue-100">Selamat datang{userProfile?.full_name ? `, ${userProfile.full_name}` : ''} di LukingzzStore</p>
+              <p className="text-sm text-blue-100">Selamat datang{userProfile?.full_name ? `, ${userProfile.full_name}` : ''} di NEXIPAY</p>
               <h2 className="mt-1 text-2xl font-bold">
                 {activeTab === 'home' && 'ISI SALDO DIGITALMU'}
                 {activeTab === 'orders' && 'Pesanan saya'}
+                {activeTab === 'scan' && 'Scan QRIS'}
                 {activeTab === 'track' && 'Lacak pesanan'}
                 {activeTab === 'account' && 'Akun pelanggan'}
+                {activeTab === 'validity' && 'Masa Aktif Kartu'}
               </h2>
               <p className="mt-2 max-w-xs text-sm text-blue-100">
                 {activeTab === 'home' && 'Praktis, mudah, dan nyaman untuk kebutuhan transaksi digital.'}
                 {activeTab === 'orders' && 'Riwayat semua pesanan yang terhubung ke akun Anda.'}
+                {activeTab === 'scan' && 'Pindai kode QRIS untuk melakukan pembayaran instan.'}
                 {activeTab === 'track' && 'Periksa perkembangan pesanan menggunakan kode pelacakan.'}
                 {activeTab === 'account' && (isLoggedIn ? 'Informasi akun Anda.' : 'Masuk atau daftar untuk mulai memesan.')}
+                {activeTab === 'validity' && 'Perpanjang masa aktif kartu dengan mudah melalui NEXIPAY.'}
               </p>
             </div>
             {activeTab === 'home' && (
@@ -1791,7 +3202,9 @@ for (const product of products) {
                 if (items.length === 0) return null
                 return (
                   <section key={category}>
-                    <div className="mb-3 flex items-center justify-between"><h3 className="font-bold text-slate-800">{category}</h3></div>
+                    <div className="mb-3 flex items-center justify-between"><h3 className="font-bold text-slate-800">
+  {category === 'Pulsa' ? 'Pulsa & Kuota' : category}
+</h3></div>
                     <div className="grid grid-cols-4 gap-2">
                       {items.map((item) => {
                         const hasVariants = item.variants.some((v) => v.selling_price > 0)
@@ -1800,7 +3213,19 @@ for (const product of products) {
                           <button 
                             key={item.id} 
                             type="button" 
-                            onClick={() => { setSelectedProductId(item.id); setSelectedVariantId(item.variants.find((v) => v.selling_price > 0)?.id || ''); setMessage(''); setCreatedOrder(null) }} 
+                            onClick={() => {
+  setSelectedProductId(item.id)
+  setSelectedVariantId(
+    String(item.code || '').toUpperCase() === 'DATA'
+      ? ''
+      : item.variants.find((v) => v.selling_price > 0)?.id || ''
+  )
+  setPhone('')
+  setSelectedDataOperator('')
+  setMessage('')
+  setCreatedOrder(null)
+  setShowPurchaseForm(true)
+}}
                             className={`relative flex flex-col items-center gap-2 rounded-2xl border p-2 text-center transition shadow-sm hover:shadow-md ${isSelected ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white'}`}
                           >
                             {renderProductIcon(item)}
@@ -1810,6 +3235,29 @@ for (const product of products) {
                           
                         )
                       })}
+
+                      {category === 'Layanan Lainnya' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('validity')
+                            setValidityMessage('')
+                          }}
+                          className="relative flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 text-center shadow-sm transition hover:shadow-md"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                            <img
+  src="/images/masa-aktif-icon.png"
+  alt="Masa Aktif Kartu"
+  className="h-10 w-10 rounded-xl object-cover"
+/>
+                          </div>
+                          <span className="line-clamp-2 text-xs font-semibold leading-tight">
+                            Masa Aktif Kartu
+                          </span>
+                        </button>
+                      )}
+
                     </div>
                   </section>
                 )
@@ -1818,14 +3266,14 @@ for (const product of products) {
               {isLoggedIn && rewards.length > 0 && (
                 <section className="mb-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="font-bold text-slate-800">🎁 Tukar Poin</h3>
+                    <h3 className="font-bold text-slate-800">&#x1F381; Tukar Poin</h3>
                   </div>
                   
                   <div className="grid grid-cols-4 gap-2">
                     {rewards.map((reward) => (
                       <div key={reward.id} className="relative flex flex-col items-center justify-between gap-1 rounded-2xl border border-amber-200 bg-amber-50/50 p-2 text-center shadow-sm">
                         <div className="flex flex-col items-center">
-                          <span className="text-3xl mb-1">💎</span>
+                          <span className="text-3xl mb-1">&#x1F48E;</span>
                           <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-slate-800">{reward.name}</span>
                           <span className="mt-1 text-[9px] font-bold text-amber-600">{reward.points_required} Poin</span>
                         </div>
@@ -1879,23 +3327,46 @@ for (const product of products) {
                 </section>
               )}
 
-              {!productsLoading && !productsError && products.length > 0 && (
-                <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${selectedProduct ? 'block' : 'hidden'}`}>
-                  <div className="mb-4 flex items-center gap-2"><ArrowDownUp className="text-blue-700" size={20} /><h3 className="font-bold">Formulir pembelian</h3></div>
+             {!productsLoading && !productsError && products.length > 0 && showPurchaseForm && selectedProduct && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+    <section className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <ArrowDownUp className="text-blue-700" size={20} />
+          <h3 className="font-bold">Formulir pembelian</h3>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowPurchaseForm(false)}
+          className="rounded-full bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+          aria-label="Tutup formulir"
+        >
+          <X size={20} />
+        </button>
+      </div>
                   <div className="mb-4 rounded-xl bg-slate-50 p-3 text-sm">
                     <div className="flex justify-between gap-3"><span className="text-slate-500">Produk dipilih</span><span className="text-right font-semibold">{selectedProduct?.name || '-'}</span></div>
                   </div>
-                  {selectedProduct && !productHasVariants && (
+                  {selectedProduct && !productHasVariants && !(isDataProduct && !currentDataOperator) && (
                     <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
                       <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-700" />
-                      <div><p className="text-sm font-bold text-amber-800">Produk belum tersedia</p><p className="mt-1 text-xs leading-5 text-amber-700">Produk ini belum memiliki varian aktif dengan harga jual. Silakan pilih produk lain.</p></div>
+                      <div>
+  <p className="text-sm font-bold text-amber-800">
+    {isDataProduct ? 'Paket belum tersedia' : 'Produk belum tersedia'}
+  </p>
+  <p className="mt-1 text-xs leading-5 text-amber-700">
+    {isDataProduct
+      ? 'Belum ada paket untuk operator ini. Silakan pilih operator lain atau hubungi admin.'
+      : 'Produk ini belum memiliki varian aktif dengan harga jual. Silakan pilih produk lain.'}
+  </p>
+</div>
                     </div>
                   )}
                   {productHasVariants && (
                     <div className="mb-4">
                       <label className="mb-2 block text-sm font-medium">Pilih varian</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {activeVariants.map((variant) => {
+                        {visibleVariants.map((variant) => {
                           const isChosen = selectedVariantId === variant.id
                           return (
                             <button key={variant.id} type="button" onClick={() => { setSelectedVariantId(variant.id); setMessage(''); setCreatedOrder(null) }} className={`rounded-xl border px-3 py-3 text-left text-sm transition ${isChosen ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700'}`}>
@@ -1962,7 +3433,7 @@ for (const product of products) {
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold">Nominal transfer (Rp)</label>
                         <input type="number" min="10000" max="1000000" step="1000" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} placeholder="Minimal 10.000" className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500" />
-                        <p className="mt-1 text-[11px] leading-4 text-slate-500">Nominal Rp10.000–Rp1.000.000, kelipatan Rp1.000. Admin akan memproses transfer secara manual setelah pembayaran diverifikasi.</p>
+                        <p className="mt-1 text-[11px] leading-4 text-slate-500">Nominal Rp10.000â€“Rp1.000.000, kelipatan Rp1.000. Admin akan memproses transfer secara manual setelah pembayaran diverifikasi.</p>
                       </div>
                     </div>
                   ) : (
@@ -1970,7 +3441,40 @@ for (const product of products) {
                       <label className="mb-2 block text-sm font-medium">
                         {selectedProduct && getCategoryForProduct(selectedProduct) === 'Game' ? 'Masukkan User ID' : 'Nomor tujuan isi saldo'}
                       </label>
-                      <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={selectedProduct && getCategoryForProduct(selectedProduct) === 'Game' ? 'Masukkan ID Game Anda' : 'Contoh: 08xxxxxxxxxx'} className="mb-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                      <input type="text" value={phone} onChange={(e) => {
+  setPhone(e.target.value)
+  setSelectedDataOperator('')
+  setSelectedVariantId('')
+}} placeholder={selectedProduct && getCategoryForProduct(selectedProduct) === 'Game' ? 'Masukkan ID Game Anda' : 'Contoh: 08xxxxxxxxxx'} className="mb-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                      {isDataProduct && (
+  <div className="mb-4">
+    <label className="mb-2 block text-sm font-medium">
+      Pilih operator Paket Data
+    </label>
+    <select
+      value={currentDataOperator}
+      onChange={(e) => {
+        setSelectedDataOperator(e.target.value)
+        setSelectedVariantId('')
+        setMessage('')
+        setCreatedOrder(null)
+      }}
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+    >
+      <option value="">Pilih operator</option>
+      {dataOperatorOptions.map((operator) => (
+        <option key={operator.code} value={operator.code}>
+          {operator.label}
+        </option>
+      ))}
+    </select>
+    <p className="mt-2 text-xs text-slate-500">
+      {detectedDataOperator
+        ? `Operator terdeteksi: ${dataOperatorOptions.find((item) => item.code === detectedDataOperator)?.label}. Silakan pastikan operator nomor Anda benar.`
+        : 'Masukkan nomor HP, lalu pilih operator secara manual.'}
+    </p>
+  </div>
+)}
                     </>
                   )}
 
@@ -2002,9 +3506,9 @@ for (const product of products) {
                       <button type="button" onClick={() => openTracking(createdOrder)} className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700">Lanjut ke Pembayaran</button>
                     </div>
                   )}
-                </section>
-              )}
-
+                                  </section>
+                  </div>
+                )}
               <section className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 rounded-xl bg-white p-3 shadow-sm"><ShieldCheck className="shrink-0 text-emerald-600" size={22} /><span className="text-xs font-medium">Transaksi diperiksa admin</span></div>
                 <div className="flex items-center gap-2 rounded-xl bg-white p-3 shadow-sm"><Clock className="shrink-0 text-blue-600" size={22} /><span className="text-xs font-medium">Status pesanan</span></div>
@@ -2067,6 +3571,153 @@ for (const product of products) {
               )}
             </section>
           )}
+                    {activeTab === 'validity' && (
+            <section className="space-y-4">
+
+              {!isLoggedIn ? (
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center">
+                  <Clock size={38} className="mx-auto mb-3 text-slate-300" />
+                  <h3 className="font-bold text-slate-700">Silakan login</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Masuk ke akun NEXIPAY untuk menggunakan layanan Masa Aktif Kartu.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserAuthMode('login')
+                      setUserPage('login')
+                      setUserFormError('')
+                    }}
+                    className="mt-5 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white"
+                  >
+                    Masuk
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-700 to-indigo-700 p-5 text-white shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <Clock size={28} />
+                      <div>
+                        <h3 className="font-bold">Perpanjang Masa Aktif</h3>
+                        <p className="mt-1 text-xs text-blue-100">
+                          Pilih operator dan paket sesuai kebutuhan kartu Anda.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Pilih operator
+                      </label>
+                      <select
+                        value={validityOperator}
+                        onChange={(event) => {
+                          setValidityOperator(event.target.value)
+                          setSelectedValidityPackage('')
+                          setValidityMessage('')
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-blue-500"
+                      >
+                        {['Telkomsel', 'Indosat', 'XL', 'Tri', 'Axis', 'Smartfren'].map((operator) => (
+                          <option key={operator} value={operator}>{operator}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Nomor kartu tujuan
+                      </label>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={validityNumber}
+                        onChange={(event) => setValidityNumber(event.target.value.replace(/\D/g, '').slice(0, 15))}
+                        placeholder="Contoh: 081234567890"
+                        className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <h3 className="mb-3 font-bold text-slate-800">Pilih paket masa aktif</h3>
+
+                    {validityLoading ? (
+                      <div className="py-6 text-center text-sm text-slate-500">
+                        <RefreshCw size={22} className="mx-auto mb-2 animate-spin text-blue-600" />
+                        Memuat paket...
+                      </div>
+                    ) : validityPackages.length === 0 ? (
+                      <div className="rounded-xl bg-slate-50 p-5 text-center">
+                        <Package size={30} className="mx-auto mb-2 text-slate-300" />
+                        <p className="text-sm font-semibold text-slate-600">Belum ada paket tersedia</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Silakan periksa kembali nanti.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {validityPackages.map((pkg) => (
+                          <button
+                            key={pkg.id}
+                            type="button"
+                            onClick={() => setSelectedValidityPackage(pkg.id)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition ${
+                              selectedValidityPackage === pkg.id
+                                ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200'
+                                : 'border-slate-200 hover:border-blue-300'
+                            }`}
+                          >
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{pkg.package_name}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {pkg.duration_days} hari · {pkg.operator}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-extrabold text-blue-700">
+                                {formatRupiah(Number(pkg.price))}
+                              </p>
+                              {selectedValidityPackage === pkg.id && (
+                                <span className="text-[10px] font-semibold text-blue-600">Dipilih</span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {validityMessage && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {validityMessage}
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    Pastikan operator, nomor kartu, dan paket sudah benar sebelum mengajukan pesanan.
+                  </div>
+                                    <button
+                    type="button"
+                    onClick={handleValidityOrder}
+                    disabled={validitySubmitting || validityLoading || validityPackages.length === 0}
+                    className="w-full rounded-xl bg-blue-700 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {validitySubmitting ? 'Mengirim pengajuan...' : 'Ajukan Masa Aktif'}
+                  </button>
+                </>
+              )}
+            </section>
+          )}
+         {activeTab === 'scan' && (
+  <QrisScanner
+    userToken={userToken}
+    onSubmitted={loadUserBalance}
+  />
+)}
 
           {activeTab === 'track' && (
             <section className="space-y-4">
@@ -2094,7 +3745,7 @@ for (const product of products) {
                 <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
                     <PackageCheck size={23} className="text-emerald-600" />
-                    <div><h3 className="font-bold">Detail pesanan ditemukan</h3><p className="text-xs text-slate-500">Data terbaru dari server LukingzzStore</p></div>
+                    <div><h3 className="font-bold">Detail pesanan ditemukan</h3><p className="text-xs text-slate-500">Data terbaru dari server NEXIPAY</p></div>
                   </div>
                   <p className="mt-4 text-xs font-semibold text-slate-400">NOMOR PESANAN</p>
                   <p className="mt-1 break-all font-extrabold text-slate-800">{trackedOrder.order_number}</p>
@@ -2126,7 +3777,7 @@ for (const product of products) {
               {isLoggedIn && userProfile ? (
                 <>
                   <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-600 to-blue-800 p-5 text-white shadow-lg">
-                    <p className="text-sm text-blue-100">Saldo LukingzzStore</p>
+                    <p className="text-sm text-blue-100">Saldo NEXIPAY</p>
                     <h2 className="mt-1 text-3xl font-extrabold">{formatRupiah(userBalance)}</h2>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -2288,7 +3939,7 @@ for (const product of products) {
                   <div><h3 className="text-sm font-bold text-blue-800">Butuh bantuan?</h3><p className="mt-1 text-xs leading-5 text-blue-700">Simpan nomor pesanan dan kode pelacakan untuk memeriksa status.</p></div>
                 </div>
               </div>
-              <p className="pb-3 text-center text-xs text-slate-400">LukingzzStore · Layanan saldo digital</p>
+              <p className="pb-3 text-center text-xs text-slate-400">NEXIPAY · Layanan saldo digital</p>
             </section>
           )}
         </main>
@@ -2299,7 +3950,7 @@ for (const product of products) {
               {!topupQrisData ? (
                 <>
                   <h3 className="text-lg font-bold text-slate-800">Isi Saldo</h3>
-                  <p className="mt-1 text-xs text-slate-500">Pilih nominal isi saldo. Pembayaran akan diverifikasi manual oleh Admin.</p>
+                  <p className="mt-1 text-xs text-slate-500">Pilih nominal isi saldo. </p>
                   <form onSubmit={handleTopup} className="mt-4 space-y-3">
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-slate-700">Nominal (Rp)</label>
@@ -2377,9 +4028,18 @@ for (const product of products) {
         )}
 
         
-        <nav className="fixed bottom-0 left-1/2 z-20 grid w-full max-w-md -translate-x-1/2 grid-cols-4 border-t border-slate-200 bg-white px-2 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+        <nav className="fixed bottom-0 left-1/2 z-20 grid w-full max-w-md -translate-x-1/2 grid-cols-5 border-t border-slate-200 bg-white px-2 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
           <button type="button" onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-blue-700' : 'text-slate-400'}`}><Home size={21} /><span className={`text-[10px] ${activeTab === 'home' ? 'font-semibold' : ''}`}>Beranda</span></button>
           <button type="button" onClick={() => setActiveTab('orders')} className={`flex flex-col items-center gap-1 ${activeTab === 'orders' ? 'text-blue-700' : 'text-slate-400'}`}><ReceiptText size={21} /><span className={`text-[10px] ${activeTab === 'orders' ? 'font-semibold' : ''}`}>Pesanan</span></button>
+            
+          <button
+  type="button"
+  onClick={() => setActiveTab('scan')}
+  className={`flex flex-col items-center gap-1 ${activeTab === 'scan' ? 'text-blue-700' : 'text-slate-400'}`}
+>
+  <QrCode size={21} />
+  <span className={`text-[10px] ${activeTab === 'scan' ? 'font-semibold' : ''}`}>Scan QRIS</span>
+</button>
           <button type="button" onClick={() => { setTrackedOrder(null); setTrackingMessage(''); setActiveTab('track') }} className={`flex flex-col items-center gap-1 ${activeTab === 'track' ? 'text-blue-700' : 'text-slate-400'}`}><Search size={21} /><span className={`text-[10px] ${activeTab === 'track' ? 'font-semibold' : ''}`}>Lacak</span></button>
           <button type="button" onClick={() => setActiveTab('account')} className={`flex flex-col items-center gap-1 ${activeTab === 'account' ? 'text-blue-700' : 'text-slate-400'}`}><UserRound size={21} /><span className={`text-[10px] ${activeTab === 'account' ? 'font-semibold' : ''}`}>{isLoggedIn ? 'Akun' : 'Masuk'}</span></button>
         </nav>
